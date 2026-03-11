@@ -485,7 +485,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
 
       // Build response text
       let text = `Logged #${state.totalExperiments}: ${experiment.status}`;
-      if (isBaseline) text += " 📌 NEW BASELINE";
+      if (isBaseline) text += " NEW BASELINE";
       text += ` — ${experiment.description}`;
 
       if (state.bestMetric !== null) {
@@ -535,7 +535,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
             ? "error"
             : "warning";
       text += theme.fg(color, args.status);
-      if (args.new_baseline) text += theme.fg("accent", " 📌 baseline");
+      if (args.new_baseline) text += theme.fg("accent", " baseline");
       text += " " + theme.fg("dim", args.description);
       return new Text(text, 0, 0);
     },
@@ -561,7 +561,7 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
         theme.fg(color, `${icon} `) +
         theme.fg("accent", `#${s.totalExperiments}`);
 
-      if (exp.newBaseline) text += theme.fg("accent", " 📌");
+
 
       text += " " + theme.fg("muted", exp.description);
 
@@ -794,10 +794,7 @@ class DashboardComponent {
           }
         }
 
-        // Show 📌 after row number for baseline rows, keeps alignment
-        const idxStr = isBaseline
-          ? th.fg("dim", String(i + 1)) + th.fg("accent", "📌".padEnd(col.idx - String(i + 1).length))
-          : th.fg("dim", String(i + 1).padEnd(col.idx));
+        const idxStr = th.fg("dim", String(i + 1).padEnd(col.idx));
 
         let rowLine =
           `  ${idxStr}` +
