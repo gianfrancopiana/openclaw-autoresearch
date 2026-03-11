@@ -8,7 +8,7 @@
  * - `run_experiment` tool — runs any command, times it, captures output, detects pass/fail
  * - `log_experiment` tool — records results with session-persisted state
  * - Status widget showing experiment count + best metric
- * - `/autoresearch` command — interactive experiment dashboard
+ * - Ctrl+R toggle to expand/collapse full dashboard inline above the editor
  *
  * Supports multiple metrics (primary + secondaries) and "new baseline" marking
  * for tracking the reference point against which improvements are measured.
@@ -21,7 +21,7 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { truncateTail } from "@mariozechner/pi-coding-agent";
 import { StringEnum } from "@mariozechner/pi-ai";
-import { Text, truncateToWidth, matchesKey } from "@mariozechner/pi-tui";
+import { Text, truncateToWidth } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 // ---------------------------------------------------------------------------
@@ -210,9 +210,189 @@ function findBaselineSecondary(
 // Extension
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Dashboard table renderer (pure function, no UI deps)
+// ---------------------------------------------------------------------------
+
+function renderDashboardLines(
+  st: ExperimentState,
+  width: number,
+  th: Theme
+): string[] {
+  const lines: string[] = [];
+
+  if (st.totalExperiments === 0) {
+    lines.push(`  ${th.fg("dim", "No experiments yet.")}`);
+    return lines;
+  }
+
+  const kept = st.results.filter((r) => r.status === "keep").length;
+  const discarded = st.results.filter((r) => r.status === "discard").length;
+  const crashed = st.results.filter((r) => r.status === "crash").length;
+  const best = formatMetric(st.bestMetric, st.metricUnit);
+
+  lines.push(
+    truncateToWidth(
+      `  ${th.fg("muted", "Total:")} ${th.fg("text", String(st.totalExperiments))}` +
+        `  ${th.fg("success", `${kept} kept`)}` +
+        `  ${th.fg("warning", `${discarded} discarded`)}` +
+        `  ${th.fg("error", `${crashed} crashed`)}`,
+      width
+    )
+  );
+
+  // Baseline (primary metric bolded with star)
+  lines.push(
+    truncateToWidth(
+      `  ${th.fg("muted", "Baseline:")} ${th.fg("warning", th.bold(`★ ${st.metricName}: ${best}`))}`,
+      width
+    )
+  );
+
+  // Secondary metric baselines
+  if (st.secondaryMetrics.length > 0) {
+    const baselines = findBaselineSecondary(st.results, st.secondaryMetrics);
+    const secondaryParts: string[] = [];
+    for (const sm of st.secondaryMetrics) {
+      const val = baselines[sm.name];
+      if (val !== undefined) {
+        secondaryParts.push(`${sm.name}: ${formatCompact(val, sm.unit)}`);
+      }
+    }
+    if (secondaryParts.length > 0) {
+      lines.push(
+        truncateToWidth(
+          `  ${th.fg("muted", "         ")} ${th.fg("muted", secondaryParts.join("  "))}`,
+          width
+        )
+      );
+    }
+  }
+
+  if (st.runTag) {
+    lines.push(
+      truncateToWidth(
+        `  ${th.fg("muted", "Tag:")} ${th.fg("dim", st.runTag)}`,
+        width
+      )
+    );
+  }
+
+  lines.push("");
+
+  // Column definitions
+  const secMetrics = st.secondaryMetrics;
+  const col = { idx: 4, commit: 9, primary: 14, status: 9 };
+  const secColWidth = 14;
+  const totalSecWidth = secMetrics.length * secColWidth;
+  const descW = Math.max(
+    10,
+    width - col.idx - col.commit - col.primary - totalSecWidth - col.status - 10
+  );
+
+  // Table header — primary metric name bolded with ★
+  let headerLine =
+    `  ${th.fg("muted", "#".padEnd(col.idx))}` +
+    `${th.fg("muted", "commit".padEnd(col.commit))}` +
+    `${th.fg("warning", th.bold(("★ " + st.metricName).slice(0, col.primary - 1).padEnd(col.primary)))}`;
+
+  for (const sm of secMetrics) {
+    headerLine += th.fg(
+      "muted",
+      sm.name.slice(0, secColWidth - 1).padEnd(secColWidth)
+    );
+  }
+
+  headerLine +=
+    `${th.fg("muted", "status".padEnd(col.status))}` +
+    `${th.fg("muted", "description")}`;
+
+  lines.push(truncateToWidth(headerLine, width));
+  lines.push(
+    truncateToWidth(
+      `  ${th.fg("borderMuted", "─".repeat(width - 4))}`,
+      width
+    )
+  );
+
+  // Baseline values for delta display
+  const baselinePrimary = findBaselineMetric(st.results);
+  const baselineSecondary = findBaselineSecondary(
+    st.results,
+    st.secondaryMetrics
+  );
+
+  for (let i = 0; i < st.results.length; i++) {
+    const r = st.results[i];
+    const color =
+      r.status === "keep"
+        ? "success"
+        : r.status === "crash"
+          ? "error"
+          : "warning";
+
+    const isBaseline = r.newBaseline;
+
+    // Primary metric with color coding
+    const primaryStr = formatCompact(r.metric, st.metricUnit);
+    let primaryColor: string = "text";
+    if (isBaseline) {
+      primaryColor = "warning";
+    } else if (
+      baselinePrimary !== null &&
+      r.status === "keep" &&
+      r.metric > 0
+    ) {
+      if (isBetter(r.metric, baselinePrimary, st.bestDirection)) {
+        primaryColor = "success";
+      } else if (r.metric !== baselinePrimary) {
+        primaryColor = "error";
+      }
+    }
+
+    const idxStr = th.fg("dim", String(i + 1).padEnd(col.idx));
+
+    let rowLine =
+      `  ${idxStr}` +
+      `${th.fg("accent", r.commit.padEnd(col.commit))}` +
+      `${th.fg(primaryColor, th.bold(primaryStr.padEnd(col.primary)))}`;
+
+    // Secondary metrics
+    const rowMetrics = r.metrics ?? {};
+    for (const sm of secMetrics) {
+      const val = rowMetrics[sm.name];
+      if (val !== undefined) {
+        const secStr = formatCompact(val, sm.unit);
+        let secColor: string = "dim";
+        const bv = baselineSecondary[sm.name];
+        if (isBaseline) {
+          secColor = "muted";
+        } else if (bv !== undefined && bv !== 0) {
+          secColor = val <= bv ? "success" : "error";
+        }
+        rowLine += th.fg(secColor, secStr.padEnd(secColWidth));
+      } else {
+        rowLine += th.fg("dim", "—".padEnd(secColWidth));
+      }
+    }
+
+    rowLine +=
+      `${th.fg(color, r.status.padEnd(col.status))}` +
+      `${th.fg("muted", r.description.slice(0, descW))}`;
+
+    lines.push(truncateToWidth(rowLine, width));
+  }
+
+  return lines;
+}
+
+// ---------------------------------------------------------------------------
+// Extension
+// ---------------------------------------------------------------------------
+
 export default function autoresearchExtension(pi: ExtensionAPI) {
-  // Listener for dashboard live updates
-  let onStateChange: (() => void) | null = null;
+  let dashboardExpanded = false;
+  let lastCtx: ExtensionContext | null = null;
 
   let state: ExperimentState = {
     results: [],
@@ -264,46 +444,82 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
 
   const updateWidget = (ctx: ExtensionContext) => {
     if (!ctx.hasUI) return;
+    lastCtx = ctx;
 
     if (state.totalExperiments === 0) {
       ctx.ui.setWidget("autoresearch", undefined);
       return;
     }
 
-    const kept = state.results.filter((r) => r.status === "keep").length;
-    const crashed = state.results.filter((r) => r.status === "crash").length;
-    const best = formatMetric(state.bestMetric, state.metricUnit);
+    if (dashboardExpanded) {
+      // Expanded: full dashboard table rendered as widget
+      ctx.ui.setWidget("autoresearch", (_tui, theme) => {
+        const width = process.stdout.columns || 120;
+        const lines: string[] = [];
 
-    ctx.ui.setWidget("autoresearch", (_tui, theme) => {
-      const parts = [
-        theme.fg("accent", "🔬 autoresearch"),
-        theme.fg("muted", ` ${state.totalExperiments} runs`),
-        theme.fg("success", ` ${kept} kept`),
-        crashed > 0 ? theme.fg("error", ` ${crashed} crashed`) : "",
-        theme.fg("dim", " │ "),
-        theme.fg("warning", theme.bold(`★ ${state.metricName}: ${best}`)),
-      ];
+        lines.push(
+          truncateToWidth(
+            theme.fg("borderMuted", "─".repeat(3)) +
+              theme.fg("accent", " 🔬 autoresearch ") +
+              theme.fg("borderMuted", "─".repeat(Math.max(0, width - 22))),
+            width
+          )
+        );
 
-      // Show secondary metric baselines in widget
-      if (state.secondaryMetrics.length > 0) {
-        const baselines = findBaselineSecondary(state.results, state.secondaryMetrics);
-        for (const sm of state.secondaryMetrics) {
-          const val = baselines[sm.name];
-          if (val !== undefined) {
-            parts.push(
-              theme.fg("dim", "  "),
-              theme.fg("muted", `${sm.name}: ${formatCompact(val, sm.unit)}`)
-            );
+        lines.push(...renderDashboardLines(state, width, theme));
+
+        lines.push(
+          `  ${theme.fg("dim", "ctrl+r to collapse")}`
+        );
+        lines.push("");
+
+        return new Text(lines.join("\n"), 0, 0);
+      });
+    } else {
+      // Collapsed: compact one-liner
+      const kept = state.results.filter((r) => r.status === "keep").length;
+      const crashed = state.results.filter((r) => r.status === "crash").length;
+      const best = formatMetric(state.bestMetric, state.metricUnit);
+
+      ctx.ui.setWidget("autoresearch", (_tui, theme) => {
+        const parts = [
+          theme.fg("accent", "🔬 autoresearch"),
+          theme.fg("muted", ` ${state.totalExperiments} runs`),
+          theme.fg("success", ` ${kept} kept`),
+          crashed > 0 ? theme.fg("error", ` ${crashed} crashed`) : "",
+          theme.fg("dim", " │ "),
+          theme.fg("warning", theme.bold(`★ ${state.metricName}: ${best}`)),
+        ];
+
+        // Show secondary metric baselines
+        if (state.secondaryMetrics.length > 0) {
+          const baselines = findBaselineSecondary(
+            state.results,
+            state.secondaryMetrics
+          );
+          for (const sm of state.secondaryMetrics) {
+            const val = baselines[sm.name];
+            if (val !== undefined) {
+              parts.push(
+                theme.fg("dim", "  "),
+                theme.fg(
+                  "muted",
+                  `${sm.name}: ${formatCompact(val, sm.unit)}`
+                )
+              );
+            }
           }
         }
-      }
 
-      if (state.runTag) {
-        parts.push(theme.fg("dim", ` │ ${state.runTag}`));
-      }
+        if (state.runTag) {
+          parts.push(theme.fg("dim", ` │ ${state.runTag}`));
+        }
 
-      return new Text(parts.join(""), 0, 0);
-    });
+        parts.push(theme.fg("dim", "  (ctrl+r to expand)"));
+
+        return new Text(parts.join(""), 0, 0);
+      });
+    }
   };
 
   pi.on("session_start", async (_e, ctx) => reconstructState(ctx));
@@ -507,7 +723,6 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
       }
 
       updateWidget(ctx);
-      onStateChange?.();
 
       // Build response text
       let text = `Logged #${state.totalExperiments}: ${experiment.status}`;
@@ -612,262 +827,18 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
   });
 
   // -----------------------------------------------------------------------
-  // /autoresearch command — dashboard
+  // Ctrl+R — toggle dashboard expand/collapse
   // -----------------------------------------------------------------------
 
-  pi.registerCommand("autoresearch", {
-    description: "Show autoresearch experiment dashboard",
-    handler: async (_args, ctx) => {
-      if (!ctx.hasUI) {
-        ctx.ui.notify("/autoresearch requires interactive mode", "error");
+  pi.registerShortcut("ctrl+r", {
+    description: "Toggle autoresearch dashboard",
+    handler: async (ctx) => {
+      if (state.totalExperiments === 0) {
+        ctx.ui.notify("No experiments yet", "info");
         return;
       }
-
-      await ctx.ui.custom<void>((tui, theme, _kb, done) => {
-        const dashboard = new DashboardComponent(state, theme, () => {
-          onStateChange = null;
-          done();
-        });
-        onStateChange = () => {
-          dashboard.invalidate();
-          tui.requestRender?.();
-        };
-        return dashboard;
-      });
+      dashboardExpanded = !dashboardExpanded;
+      updateWidget(ctx);
     },
   });
-}
-
-// ---------------------------------------------------------------------------
-// Dashboard UI
-// ---------------------------------------------------------------------------
-
-class DashboardComponent {
-  private state: ExperimentState;
-  private theme: Theme;
-  private onClose: () => void;
-  private cachedWidth?: number;
-  private cachedLines?: string[];
-  constructor(state: ExperimentState, theme: Theme, onClose: () => void) {
-    this.state = state;
-    this.theme = theme;
-    this.onClose = onClose;
-  }
-
-  handleInput(data: string): void {
-    if (matchesKey(data, "escape") || matchesKey(data, "ctrl+c")) {
-      this.onClose();
-    }
-  }
-
-  render(width: number): string[] {
-    if (this.cachedLines && this.cachedWidth === width) return this.cachedLines;
-
-    const lines: string[] = [];
-    const th = this.theme;
-
-    lines.push("");
-    lines.push(
-      truncateToWidth(
-        th.fg("borderMuted", "─".repeat(3)) +
-          th.fg("accent", " 🔬 autoresearch ") +
-          th.fg("borderMuted", "─".repeat(Math.max(0, width - 22))),
-        width
-      )
-    );
-    lines.push("");
-
-    if (this.state.totalExperiments === 0) {
-      lines.push(
-        truncateToWidth(`  ${th.fg("dim", "No experiments yet.")}`, width)
-      );
-    } else {
-      const kept = this.state.results.filter(
-        (r) => r.status === "keep"
-      ).length;
-      const discarded = this.state.results.filter(
-        (r) => r.status === "discard"
-      ).length;
-      const crashed = this.state.results.filter(
-        (r) => r.status === "crash"
-      ).length;
-      const best = formatMetric(this.state.bestMetric, this.state.metricUnit);
-
-      lines.push(
-        truncateToWidth(
-          `  ${th.fg("muted", "Total:")} ${th.fg("text", String(this.state.totalExperiments))}` +
-            `  ${th.fg("success", `${kept} kept`)}` +
-            `  ${th.fg("warning", `${discarded} discarded`)}` +
-            `  ${th.fg("error", `${crashed} crashed`)}`,
-          width
-        )
-      );
-
-      // Show baseline (primary metric bolded with star)
-      lines.push(
-        truncateToWidth(
-          `  ${th.fg("muted", "Baseline:")} ${th.fg("warning", th.bold(`★ ${this.state.metricName}: ${best}`))}`,
-          width
-        )
-      );
-
-      // Show secondary metric baselines
-      if (this.state.secondaryMetrics.length > 0) {
-        const baselines = findBaselineSecondary(this.state.results, this.state.secondaryMetrics);
-        const secondaryParts: string[] = [];
-        for (const sm of this.state.secondaryMetrics) {
-          const val = baselines[sm.name];
-          if (val !== undefined) {
-            secondaryParts.push(
-              `${sm.name}: ${formatCompact(val, sm.unit)}`
-            );
-          }
-        }
-        if (secondaryParts.length > 0) {
-          lines.push(
-            truncateToWidth(
-              `  ${th.fg("muted", "         ")} ${th.fg("muted", secondaryParts.join("  "))}`,
-              width
-            )
-          );
-        }
-      }
-
-      if (this.state.runTag) {
-        lines.push(
-          truncateToWidth(
-            `  ${th.fg("muted", "Tag:")} ${th.fg("dim", this.state.runTag)}`,
-            width
-          )
-        );
-      }
-
-      lines.push("");
-
-      // Build column definitions
-      const hasSecondary = this.state.secondaryMetrics.length > 0;
-      const secMetrics = this.state.secondaryMetrics;
-
-      // Fixed column widths
-      const col = {
-        idx: 4,
-        commit: 9,
-        primary: 14,
-        status: 9,
-      };
-      // Dynamic secondary metric columns
-      const secColWidth = 14;
-      const totalSecWidth = secMetrics.length * secColWidth;
-      const descW = Math.max(
-        10,
-        width - col.idx - col.commit - col.primary - totalSecWidth - col.status - 10
-      );
-
-      // Table header — primary metric name is bolded with ★
-      let headerLine =
-        `  ${th.fg("muted", "#".padEnd(col.idx))}` +
-        `${th.fg("muted", "commit".padEnd(col.commit))}` +
-        `${th.fg("warning", th.bold(("★ " + this.state.metricName).slice(0, col.primary - 1).padEnd(col.primary)))}`;
-
-      for (const sm of secMetrics) {
-        headerLine += th.fg(
-          "muted",
-          sm.name.slice(0, secColWidth - 1).padEnd(secColWidth)
-        );
-      }
-
-      headerLine +=
-        `${th.fg("muted", "status".padEnd(col.status))}` +
-        `${th.fg("muted", "description")}`;
-
-      lines.push(truncateToWidth(headerLine, width));
-      lines.push(
-        truncateToWidth(
-          `  ${th.fg("borderMuted", "─".repeat(width - 4))}`,
-          width
-        )
-      );
-
-      // Baseline values for delta display
-      const baselinePrimary = findBaselineMetric(this.state.results);
-      const baselineSecondary = findBaselineSecondary(this.state.results, this.state.secondaryMetrics);
-
-      for (let i = 0; i < this.state.results.length; i++) {
-        const r = this.state.results[i];
-        const color =
-          r.status === "keep"
-            ? "success"
-            : r.status === "crash"
-              ? "error"
-              : "warning";
-
-        const isBaseline = r.newBaseline;
-
-        // Format primary metric with delta indicator
-        let primaryStr = formatCompact(r.metric, this.state.metricUnit);
-        let primaryColor: string = "text";
-        if (isBaseline) {
-          primaryColor = "warning";
-        } else if (
-          baselinePrimary !== null &&
-          r.status === "keep" &&
-          r.metric > 0
-        ) {
-          if (isBetter(r.metric, baselinePrimary, this.state.bestDirection)) {
-            primaryColor = "success";
-          } else if (r.metric !== baselinePrimary) {
-            primaryColor = "error";
-          }
-        }
-
-        const idxStr = th.fg("dim", String(i + 1).padEnd(col.idx));
-
-        let rowLine =
-          `  ${idxStr}` +
-          `${th.fg("accent", r.commit.padEnd(col.commit))}` +
-          `${th.fg(primaryColor, th.bold(primaryStr.padEnd(col.primary)))}`;
-
-        // Secondary metrics (r.metrics may be absent on old reconstructed rows)
-        const rowMetrics = r.metrics ?? {};
-        for (const sm of secMetrics) {
-          const val = rowMetrics[sm.name];
-          if (val !== undefined) {
-            let secStr = formatCompact(val, sm.unit);
-            let secColor: string = "dim";
-            const bv = baselineSecondary[sm.name];
-            if (isBaseline) {
-              secColor = "muted";
-            } else if (bv !== undefined && bv !== 0) {
-              // Color code: better=green, worse=red (assume lower is better for secondary)
-              secColor = val <= bv ? "success" : "error";
-            }
-            rowLine += th.fg(secColor, secStr.padEnd(secColWidth));
-          } else {
-            rowLine += th.fg("dim", "—".padEnd(secColWidth));
-          }
-        }
-
-        rowLine +=
-          `${th.fg(color, r.status.padEnd(col.status))}` +
-          `${th.fg("muted", r.description.slice(0, descW))}`;
-
-        lines.push(truncateToWidth(rowLine, width));
-      }
-    }
-
-    lines.push("");
-    lines.push(
-      truncateToWidth(`  ${th.fg("dim", "Press Escape to close")}`, width)
-    );
-    lines.push("");
-
-    this.cachedWidth = width;
-    this.cachedLines = lines;
-    return lines;
-  }
-
-  invalidate(): void {
-    this.cachedWidth = undefined;
-    this.cachedLines = undefined;
-  }
 }
