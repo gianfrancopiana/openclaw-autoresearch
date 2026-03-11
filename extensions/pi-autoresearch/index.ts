@@ -332,7 +332,19 @@ function renderDashboardLines(
     st.secondaryMetrics
   );
 
-  for (let i = 0; i < st.results.length; i++) {
+  // Show max 6 recent runs, with a note about hidden earlier ones
+  const maxRows = 6;
+  const startIdx = Math.max(0, st.results.length - maxRows);
+  if (startIdx > 0) {
+    lines.push(
+      truncateToWidth(
+        `  ${th.fg("dim", `… ${startIdx} earlier run${startIdx === 1 ? "" : "s"}`)}`,
+        width
+      )
+    );
+  }
+
+  for (let i = startIdx; i < st.results.length; i++) {
     const r = st.results[i];
     const color =
       r.status === "keep"
@@ -471,21 +483,20 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
         const width = process.stdout.columns || 120;
         const lines: string[] = [];
 
+        const hintText = " ctrl+e to collapse ";
+        const headerLabel = " 🔬 autoresearch ";
+        const fillLen = Math.max(0, width - 3 - headerLabel.length - hintText.length - 1);
         lines.push(
           truncateToWidth(
             theme.fg("borderMuted", "─".repeat(3)) +
-              theme.fg("accent", " 🔬 autoresearch ") +
-              theme.fg("borderMuted", "─".repeat(Math.max(0, width - 22))),
+              theme.fg("accent", headerLabel) +
+              theme.fg("borderMuted", "─".repeat(fillLen)) +
+              theme.fg("dim", hintText),
             width
           )
         );
 
         lines.push(...renderDashboardLines(state, width, theme));
-
-        lines.push(
-          `  ${theme.fg("dim", "ctrl+e to collapse")}`
-        );
-        lines.push("");
 
         return new Text(lines.join("\n"), 0, 0);
       });
