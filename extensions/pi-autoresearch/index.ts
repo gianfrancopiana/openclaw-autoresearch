@@ -959,21 +959,6 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
 
       state.results.push(experiment);
 
-      // Persist to autoresearch.jsonl on disk (alongside autoresearch.md/sh)
-      try {
-        const jsonlPath = path.join(ctx.cwd, "autoresearch.jsonl");
-        let output = "";
-
-        output += JSON.stringify({
-          run: state.results.length,
-          ...experiment,
-        }) + "\n";
-
-        fs.appendFileSync(jsonlPath, output);
-      } catch {
-        // Don't fail if write fails
-      }
-
       // Register any new secondary metric names
       for (const name of Object.keys(secondaryMetrics)) {
         if (!state.secondaryMetrics.find((m) => m.name === name)) {
@@ -987,8 +972,6 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
 
       // Baseline = first run
       state.bestMetric = findBaselineMetric(state.results);
-
-      updateWidget(ctx);
 
       // Build response text
       let text = `Logged #${state.results.length}: ${experiment.status} — ${experiment.description}`;
@@ -1046,6 +1029,17 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
           } else if (gitResult.code === 0) {
             const firstLine = gitOutput.split("\n")[0] || "";
             text += `\n📝 Git: committed — ${firstLine}`;
+
+            // Update experiment record with the actual new commit hash
+            try {
+              const shaResult = await pi.exec("git", ["rev-parse", "--short=7", "HEAD"], { cwd: ctx.cwd, timeout: 5000 });
+              const newSha = (shaResult.stdout || "").trim();
+              if (newSha && newSha.length >= 7) {
+                experiment.commit = newSha;
+              }
+            } catch {
+              // Keep the original commit hash if rev-parse fails
+            }
           } else {
             text += `\n⚠️ Git commit failed (exit ${gitResult.code}): ${gitOutput.slice(0, 200)}`;
           }
@@ -1053,8 +1047,21 @@ export default function autoresearchExtension(pi: ExtensionAPI) {
           text += `\n⚠️ Git commit error: ${e instanceof Error ? e.message : String(e)}`;
         }
       } else {
-        text += `\n📝 Git: skipped commit (${params.status}) — revert with git reset --hard HEAD~1 if needed`;
+        text += `\n📝 Git: skipped commit (${params.status}) — revert with git checkout -- .`;
       }
+
+      // Persist to autoresearch.jsonl AFTER git commit (so commit hash is correct)
+      try {
+        const jsonlPath = path.join(ctx.cwd, "autoresearch.jsonl");
+        fs.appendFileSync(jsonlPath, JSON.stringify({
+          run: state.results.length,
+          ...experiment,
+        }) + "\n");
+      } catch {
+        // Don't fail if write fails
+      }
+
+      updateWidget(ctx);
 
       return {
         content: [{ type: "text", text }],
