@@ -13,24 +13,24 @@ This checklist turns the current source-faithful, agent-agnostic port plan into 
 Goal: lock the upstream target and the porting rules before implementation drifts.
 
 ### Deliverables
-- [ ] pin the upstream commit currently being ported
-- [ ] add `docs/upstream-parity-map.md`
-- [ ] add `docs/non-parity.md`
-- [ ] document exact canonical runtime files:
-  - [ ] `autoresearch.md`
-  - [ ] `autoresearch.sh`
-  - [ ] `autoresearch.jsonl`
-  - [ ] `autoresearch.ideas.md`
-- [ ] document exact tool names to preserve:
-  - [ ] `init_experiment`
-  - [ ] `run_experiment`
-  - [ ] `log_experiment`
-- [ ] document which upstream behaviors are core vs Pi-only UI/runtime
+- [x] pin the upstream commit currently being ported
+- [x] add `docs/upstream-parity-map.md`
+- [x] add `docs/non-parity.md`
+- [x] document exact canonical runtime files:
+  - [x] `autoresearch.md`
+  - [x] `autoresearch.sh`
+  - [x] `autoresearch.jsonl`
+  - [x] `autoresearch.ideas.md`
+- [x] document exact tool names to preserve:
+  - [x] `init_experiment`
+  - [x] `run_experiment`
+  - [x] `log_experiment`
+- [x] document which upstream behaviors are core vs Pi-only UI/runtime
 
 ### Review bar
-- [ ] no implementation yet beyond doc scaffolding
-- [ ] parity map makes it obvious what is copy/adapt/rewrite
-- [ ] root-level file decision is clearly frozen for v1
+- [x] no implementation yet beyond doc scaffolding
+- [x] parity map makes it obvious what is copy/adapt/rewrite
+- [x] root-level file decision is clearly frozen for v1
 
 ---
 

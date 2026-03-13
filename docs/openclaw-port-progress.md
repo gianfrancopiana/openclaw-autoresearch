@@ -2,7 +2,7 @@
 
 ## Status
 
-Current state: planning / source capture
+Current state: PR 1 complete — source contract frozen; PR 2 next
 
 ## Current reference snapshot
 
@@ -15,7 +15,8 @@ Current state: planning / source capture
 - Local repo path: `/home/node/.openclaw/workspace/projects/openclaw-autoresearch`
 - Source repo: `https://github.com/davebcn87/pi-autoresearch`
 - Local remote: `upstream`
-- Intended hosted repo: private repo under `gianfrancopiana` once GitHub auth is available for that account
+- Hosted repo: `https://github.com/gianfrancopiana/openclaw-autoresearch`
+- Local remotes: `origin` (hosted repo), `upstream` (source repo)
 
 ## Working decisions
 
@@ -35,6 +36,9 @@ Current state: planning / source capture
 - [x] decide source-first vs redesign-first approach
 - [x] write versioned port plan into repo docs
 - [x] run fresh Codex review against cloned upstream + OpenClaw plugin examples
+- [x] pin the upstream commit being ported (`2227029f`)
+- [x] add `docs/upstream-parity-map.md`
+- [x] add `docs/non-parity.md`
 
 ### Phase 1 — mechanical import
 - [ ] create OpenClaw plugin skeleton
@@ -65,14 +69,15 @@ Current state: planning / source capture
 - [ ] add ideas-backlog continuation behavior if cleanly supported
 
 ### Phase 6 — docs and parity review
-- [ ] document non-parity items
+- [x] document non-parity items
 - [ ] review all divergences against upstream
 - [ ] tighten README/docs wording to reflect faithful port
 
 ## Blockers
 
-- GitHub CLI is currently authenticated as `hub-computer`, not `gianfrancopiana`, so the private GitHub repo has not been created yet.
+- None currently for PR 2.
+- GitHub remote now exists at `gianfrancopiana/openclaw-autoresearch`; collaborator access is being used via the current local auth context.
 
 ## Next recommended action
 
-- Authenticate `gh` as `gianfrancopiana`, then create a private remote repo and push this local working repo.
+- Start PR 2: create the OpenClaw plugin skeleton without introducing provider-specific architecture.
