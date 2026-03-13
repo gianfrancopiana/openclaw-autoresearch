@@ -162,15 +162,20 @@ Goal: make file-first resumability real.
 Goal: add only the OpenClaw hooks that clearly map to upstream intent.
 
 ### Deliverables
-- [ ] add minimal `before_agent_start` integration if useful
-- [ ] inject short autoresearch context / file pointers, not huge prompts
-- [ ] evaluate `agent_end` continuation from `autoresearch.ideas.md`
-- [ ] add user-steer queueing only if it is reliable and simple
+- [x] add minimal `before_agent_start` integration if useful
+- [x] inject short autoresearch context / file pointers, not huge prompts
+- [x] evaluate `agent_end` continuation from `autoresearch.ideas.md`
+- [x] add user-steer queueing only if it is reliable and simple
+
+Notes:
+- `before_agent_start` is implemented as a small OpenClaw hook registration only when the host API exposes a generic `registerHook` surface; the injected context is limited to root-file pointers and tool reminders.
+- `agent_end` continuation from `autoresearch.ideas.md` was evaluated and deferred because the current workspace does not expose a stable, documented OpenClaw end-of-agent hook surface to implement it without brittle lifecycle assumptions.
+- queued user-steer behavior was evaluated and deferred for the same reason; PR 8 intentionally avoids hidden queues or fragile input interception.
 
 ### Review bar
-- [ ] hooks are minimal and robust
-- [ ] no brittle lifecycle complexity is introduced
-- [ ] any non-parity is documented
+- [x] hooks are minimal and robust
+- [x] no brittle lifecycle complexity is introduced
+- [x] any non-parity is documented
 
 ---
 
