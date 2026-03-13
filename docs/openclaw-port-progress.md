@@ -2,7 +2,7 @@
 
 ## Status
 
-Current state: PR 9 complete — `/autoresearch` command deferred; v1 remains skill-first
+Current state: follow-up PR complete — `/autoresearch` command implemented via documented `api.registerCommand(...)`; v1 remains skill-first
 
 ## Current reference snapshot
 
@@ -61,7 +61,8 @@ Current state: PR 9 complete — `/autoresearch` command deferred; v1 remains sk
 ### Phase 4 — entry surface
 - [x] implement skill-first start/resume flow
 - [x] evaluate `/autoresearch` command path
-- [x] document fallback if command surface differs
+- [x] implement thin `/autoresearch` command via documented `registerCommand(...)`
+- [x] keep `/autoresearch` thin and route users back to `autoresearch.md`
 
 ### Phase 5 — non-core conveniences
 - [x] add lightweight status/readout
@@ -78,7 +79,7 @@ Current state: PR 9 complete — `/autoresearch` command deferred; v1 remains sk
 ## Blockers
 
 - No stable OpenClaw hook example or SDK source is present in this workspace beyond tool registration imports, so PR 8 limits itself to a conservative `before_agent_start` registration path and documents the rest as deferred.
-- PR 9 inspected the local plugin surface and found no documented `registerCommand` path, no OpenClaw SDK package in the workspace, and no in-repo command example to follow. `/autoresearch` is therefore deferred in v1 rather than implemented via API guessing; the entry surface remains the `autoresearch-create` skill plus root-file resume.
+- The earlier PR 9 defer conclusion is superseded. We now have documented host command support in `/app/docs/tools/plugin.md` plus a real `api.registerCommand(...)` example in `/app/extensions/device-pair/index.ts`, so this follow-up implements `/autoresearch` as a thin command that detects canonical root files and routes users back to `autoresearch.md`.
 - GitHub remote now exists at `gianfrancopiana/openclaw-autoresearch`; collaborator access is being used via the current local auth context.
 
 ## Next recommended action
