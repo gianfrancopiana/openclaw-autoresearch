@@ -184,16 +184,18 @@ Notes:
 Goal: add the command only if it stays thin and source-faithful.
 
 ### Deliverables
-- [ ] implement `/autoresearch` only if OpenClaw command UX maps cleanly
-- [ ] keep it thin:
-  - [ ] detect existing session
-  - [ ] route to setup or resume
-  - [ ] point agent at `autoresearch.md`
-- [ ] otherwise explicitly document that v1 is skill-first
+- [x] inspect whether the local OpenClaw plugin surface exposes a clean command registration path
+- [x] keep `/autoresearch` deferred when command support is ambiguous in this workspace
+- [x] otherwise explicitly document that v1 is skill-first
+
+Notes:
+- PR 9 intentionally does not add a command implementation. In this workspace, the available plugin code only demonstrates `registerTool(...)` and a guarded `registerHook(...)` escape hatch used in PR 8.
+- No documented `registerCommand(...)` API, no local OpenClaw SDK package/type source, and no in-repo OpenClaw command example are available to implement against without brittle API guessing.
+- Because the plan explicitly prefers defer-over-invention when command support is awkward, v1 remains skill-first: use `autoresearch-create`, then resume from the canonical root files with `autoresearch.md` as the primary guide.
 
 ### Review bar
-- [ ] command is optional polish, not architecture
-- [ ] command does not redefine workflow semantics
+- [x] command is optional polish, not architecture
+- [x] command does not redefine workflow semantics
 
 ---
 
