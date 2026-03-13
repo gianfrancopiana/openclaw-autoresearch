@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+
 export const AUTORESEARCH_ROOT_FILES = {
   sessionDoc: "autoresearch.md",
   runnerScript: "autoresearch.sh",
@@ -12,6 +14,18 @@ export function getAutoresearchRootFilePath(
   file: AutoresearchRootFileKey,
 ): string {
   return `${cwd}/${AUTORESEARCH_ROOT_FILES[file]}`;
+}
+
+export function readAutoresearchRootFile(
+  cwd: string,
+  file: AutoresearchRootFileKey,
+): string | null {
+  const filePath = getAutoresearchRootFilePath(cwd, file);
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  return fs.readFileSync(filePath, "utf8");
 }
 
 /**

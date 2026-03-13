@@ -2,7 +2,7 @@
 
 ## Status
 
-Current state: PR 6 complete — `log_experiment` parity landed; PR 7 next
+Current state: PR 7 complete — resume/state reconstruction landed; PR 8 next
 
 ## Current reference snapshot
 
@@ -54,9 +54,9 @@ Current state: PR 6 complete — `log_experiment` parity landed; PR 7 next
 - [x] preserve config-header / segment behavior
 
 ### Phase 3 — resume behavior
-- [ ] reconstruct state from `autoresearch.jsonl`
-- [ ] detect active mode from `autoresearch.md`
-- [ ] validate file-first resumability
+- [x] reconstruct state from `autoresearch.jsonl`
+- [x] detect active mode from `autoresearch.md`
+- [x] validate file-first resumability
 
 ### Phase 4 — entry surface
 - [ ] implement skill-first start/resume flow
@@ -64,7 +64,7 @@ Current state: PR 6 complete — `log_experiment` parity landed; PR 7 next
 - [ ] document fallback if command surface differs
 
 ### Phase 5 — non-core conveniences
-- [ ] add lightweight status/readout
+- [x] add lightweight status/readout
 - [ ] add queued user steer behavior if cleanly supported
 - [ ] add ideas-backlog continuation behavior if cleanly supported
 
@@ -75,9 +75,9 @@ Current state: PR 6 complete — `log_experiment` parity landed; PR 7 next
 
 ## Blockers
 
-- None currently for PR 6.
+- None currently for PR 7.
 - GitHub remote now exists at `gianfrancopiana/openclaw-autoresearch`; collaborator access is being used via the current local auth context.
 
 ## Next recommended action
 
-- Start PR 7: reconstruct state from `autoresearch.jsonl` for resume behavior and validate file-first resumability.
+- Start PR 8: add only the minimal OpenClaw hooks that cleanly support continuation semantics.

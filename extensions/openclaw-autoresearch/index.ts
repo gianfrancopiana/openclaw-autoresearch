@@ -8,6 +8,7 @@ import {
 import { createInitExperimentTool } from "./src/tools/init-experiment.js";
 import { createRunExperimentTool } from "./src/tools/run-experiment.js";
 import { createLogExperimentTool } from "./src/tools/log-experiment.js";
+import { createAutoresearchStatusTool } from "./src/tools/autoresearch-status.js";
 
 const plugin = {
   id: AUTORESEARCH_PLUGIN_ID,
@@ -18,6 +19,7 @@ const plugin = {
     api.registerTool(createInitExperimentTool(api));
     api.registerTool(createRunExperimentTool(api));
     api.registerTool(createLogExperimentTool(api));
+    api.registerTool(createAutoresearchStatusTool(api));
   },
 };
 
