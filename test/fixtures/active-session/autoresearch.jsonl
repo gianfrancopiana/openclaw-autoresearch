@@ -1,0 +1,6 @@
+{"type":"config","name":"Parser optimization","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}
+{"run":1,"commit":"abc1234","metric":125,"metrics":{"compile_ms":50},"status":"keep","description":"baseline","timestamp":1700000000000,"segment":0}
+{"run":2,"commit":"def5678","metric":120,"metrics":{"compile_ms":48},"status":"discard","description":"attempt 1","timestamp":1700000001000,"segment":0}
+{"type":"config","name":"Parser optimization","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}
+{"run":1,"commit":"9876543","metric":130,"metrics":{"compile_ms":55,"bundle_kb":10},"status":"keep","description":"new baseline","timestamp":1700000002000,"segment":1}
+{"run":2,"commit":"7654321","metric":118,"metrics":{"compile_ms":44,"bundle_kb":9},"status":"keep","description":"keep winner","timestamp":1700000003000,"segment":1}

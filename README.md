@@ -170,6 +170,23 @@ Tracking docs in this repo:
 
 The goal is to keep future diffs against upstream understandable instead of silently redesigning the product.
 
+## Development And Validation
+
+Local validation now works with standard npm commands:
+
+```bash
+npm install --include=dev
+npm run typecheck
+npm test
+npm run validate
+```
+
+Notes:
+
+- local validation uses a small test shim for `openclaw/plugin-sdk/core` so this repo can typecheck and test without a full host checkout
+- tests focus on durable local behavior: state reconstruction, status formatting, command guidance, and plugin registration
+- the canonical runtime behavior still depends on a real OpenClaw host at runtime
+
 ## Status And Limits
 
 What is here now:

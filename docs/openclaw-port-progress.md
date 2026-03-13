@@ -2,7 +2,7 @@
 
 ## Status
 
-Current state: PR 11 complete — final parity review documented; v1 remains a skill-first, source-faithful OpenClaw port with canonical repo-root files, preserved tool names, and explicitly deferred Pi-only UI/runtime gaps
+Current state: post-plan validation follow-up in progress — local `npm run validate` now passes on the validation branch, giving the repo a real typecheck + test path in addition to the completed PR 1–11 port plan
 
 ## Current reference snapshot
 
