@@ -125,12 +125,7 @@ export function createLogExperimentTool(_api: OpenClawPluginApi) {
         currentResults,
         knownSecondaryMetrics,
       );
-      const nextState: AutoresearchStateSnapshot = {
-        ...state,
-        secondaryMetrics: knownSecondaryMetrics,
-        currentRunCount: experiment.run,
-        currentBestMetric: baselineMetric,
-      };
+      const nextState: AutoresearchStateSnapshot = reconstructStateFromJsonl(ctx.cwd);
 
       return {
         content: [

@@ -144,16 +144,16 @@ Goal: preserve the core loop semantics that make the product what it is.
 Goal: make file-first resumability real.
 
 ### Deliverables
-- [ ] reconstruct state from `autoresearch.jsonl`
-- [ ] detect active mode from `autoresearch.md`
-- [ ] read `autoresearch.ideas.md` when relevant
-- [ ] optionally add thin `autoresearch_status`
-- [ ] add tests or fixtures for resumed sessions where practical
+- [x] reconstruct state from `autoresearch.jsonl`
+- [x] detect active mode from `autoresearch.md`
+- [x] read `autoresearch.ideas.md` when relevant
+- [x] optionally add thin `autoresearch_status`
+- [x] add tests or fixtures for resumed sessions where practical
 
 ### Review bar
-- [ ] session can resume from files alone
-- [ ] hidden runtime state is not required
-- [ ] status surface is thin and truthful
+- [x] session can resume from files alone
+- [x] hidden runtime state is not required
+- [x] status surface is thin and truthful
 
 ---
 
