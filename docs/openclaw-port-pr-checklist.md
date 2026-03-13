@@ -87,17 +87,17 @@ Goal: port `autoresearch-create` closely before changing behavior.
 Goal: land the first real core tool with faithful file semantics.
 
 ### Deliverables
-- [ ] implement `init_experiment`
-- [ ] write config header to `autoresearch.jsonl`
-- [ ] support re-init as a new baseline segment
-- [ ] preserve metric name / unit / direction semantics
-- [ ] preserve secondary metric contract shape
-- [ ] ensure root-level file discovery works
+- [x] implement `init_experiment`
+- [x] write config header to `autoresearch.jsonl`
+- [x] support re-init as a new baseline segment
+- [x] preserve metric name / unit / direction semantics
+- [x] preserve secondary metric contract shape
+- [x] ensure root-level file discovery works
 
 ### Review bar
-- [ ] behavior matches upstream config-header / segment model
-- [ ] no destructive overwrite of prior history
-- [ ] root-level files remain canonical
+- [x] behavior matches upstream config-header / segment model
+- [x] no destructive overwrite of prior history
+- [x] root-level files remain canonical
 
 ---
 

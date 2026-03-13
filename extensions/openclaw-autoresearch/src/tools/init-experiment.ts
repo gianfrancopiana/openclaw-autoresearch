@@ -1,6 +1,11 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { InitExperimentParams } from "./schemas.js";
-import { createPlaceholderToolResult } from "./placeholder.js";
+import { createConfigHeader, writeConfigHeader } from "../logging.js";
+import {
+  createEmptyStateSnapshot,
+  reconstructStateFromJsonl,
+  type AutoresearchStateSnapshot,
+} from "../state.js";
 
 export function createInitExperimentTool(_api: OpenClawPluginApi) {
   return {
@@ -9,8 +14,75 @@ export function createInitExperimentTool(_api: OpenClawPluginApi) {
     description:
       "Initialize the experiment session. Call once before the first run_experiment to set the name, primary metric, unit, and direction. Writes the config header to autoresearch.jsonl.",
     parameters: InitExperimentParams,
-    async execute() {
-      return createPlaceholderToolResult("init_experiment", "PR 4 — `init_experiment` parity");
+    async execute(
+      _toolCallId: string,
+      params: {
+        name: string;
+        metric_name: string;
+        metric_unit?: string;
+        direction?: "lower" | "higher";
+      },
+      _signal: AbortSignal,
+      _onUpdate: unknown,
+      ctx: { cwd: string },
+    ) {
+      const previousState = reconstructStateFromJsonl(ctx.cwd);
+      const isReinit = previousState.currentRunCount > 0;
+      const nextState: AutoresearchStateSnapshot = {
+        ...createEmptyStateSnapshot(),
+        name: params.name,
+        metricName: params.metric_name,
+        metricUnit: params.metric_unit ?? "",
+        bestDirection: params.direction ?? "lower",
+        currentSegment: isReinit ? previousState.currentSegment + 1 : previousState.currentSegment,
+      };
+
+      try {
+        writeConfigHeader(
+          ctx.cwd,
+          createConfigHeader({
+            name: nextState.name ?? params.name,
+            metricName: nextState.metricName,
+            metricUnit: nextState.metricUnit,
+            bestDirection: nextState.bestDirection,
+          }),
+          isReinit ? "append" : "create",
+        );
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to write autoresearch.jsonl: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            },
+          ],
+          details: {
+            status: "error",
+          },
+        };
+      }
+
+      const reinitNote = isReinit
+        ? " (re-initialized - previous results archived, new baseline needed)"
+        : "";
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Experiment initialized: "${nextState.name}"${reinitNote}\n` +
+              `Metric: ${nextState.metricName} (${nextState.metricUnit || "unitless"}, ${nextState.bestDirection} is better)\n` +
+              "Config written to autoresearch.jsonl. Now run the baseline with run_experiment.",
+          },
+        ],
+        details: {
+          status: "ok",
+          state: nextState,
+        },
+      };
     },
   };
 }

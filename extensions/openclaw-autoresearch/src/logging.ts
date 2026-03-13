@@ -1,7 +1,39 @@
-/**
- * PR 2 skeleton only.
- * This module will own append-only JSONL logging and config-header handling in PRs 4 and 6.
- */
-export function describeLoggingSkeleton(): string {
-  return "jsonl logging not implemented yet";
+import * as fs from "node:fs";
+import { getAutoresearchRootFilePath } from "./files.js";
+
+export type AutoresearchConfigHeader = {
+  type: "config";
+  name: string;
+  metricName: string;
+  metricUnit: string;
+  bestDirection: "lower" | "higher";
+};
+
+export function createConfigHeader(config: {
+  name: string;
+  metricName: string;
+  metricUnit: string;
+  bestDirection: "lower" | "higher";
+}): AutoresearchConfigHeader {
+  return {
+    type: "config",
+    name: config.name,
+    metricName: config.metricName,
+    metricUnit: config.metricUnit,
+    bestDirection: config.bestDirection,
+  };
+}
+
+export function writeConfigHeader(
+  cwd: string,
+  header: AutoresearchConfigHeader,
+  mode: "create" | "append",
+): void {
+  const jsonlPath = getAutoresearchRootFilePath(cwd, "resultsLog");
+  const line = `${JSON.stringify(header)}\n`;
+  if (mode === "append") {
+    fs.appendFileSync(jsonlPath, line);
+    return;
+  }
+  fs.writeFileSync(jsonlPath, line);
 }

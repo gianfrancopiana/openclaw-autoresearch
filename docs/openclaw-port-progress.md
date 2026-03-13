@@ -2,7 +2,7 @@
 
 ## Status
 
-Current state: PR 3 complete — skill port landed; PR 4 next
+Current state: PR 4 complete — `init_experiment` parity landed; PR 5 next
 
 ## Current reference snapshot
 
@@ -47,11 +47,11 @@ Current state: PR 3 complete — skill port landed; PR 4 next
 - [ ] decide exact `/autoresearch` command path
 
 ### Phase 2 — core tool port
-- [ ] port `init_experiment`
+- [x] port `init_experiment`
 - [ ] port `run_experiment`
 - [ ] port `log_experiment`
-- [ ] preserve root-level `autoresearch.jsonl` behavior
-- [ ] preserve config-header / segment behavior
+- [x] preserve root-level `autoresearch.jsonl` behavior
+- [x] preserve config-header / segment behavior
 
 ### Phase 3 — resume behavior
 - [ ] reconstruct state from `autoresearch.jsonl`
@@ -75,9 +75,9 @@ Current state: PR 3 complete — skill port landed; PR 4 next
 
 ## Blockers
 
-- None currently for PR 3.
+- None currently for PR 4.
 - GitHub remote now exists at `gianfrancopiana/openclaw-autoresearch`; collaborator access is being used via the current local auth context.
 
 ## Next recommended action
 
-- Start PR 4: implement `init_experiment` with faithful root-file and JSONL segment semantics.
+- Start PR 5: implement `run_experiment` with faithful command execution and result-capture semantics.
