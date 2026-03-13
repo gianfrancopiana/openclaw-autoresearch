@@ -1,0 +1,6 @@
+{"type":"config","name":"Speed up tests","metricName":"seconds","metricUnit":"s","bestDirection":"lower"}
+{"run":1,"commit":"aaaaaaa","metric":12.5,"metrics":{"compile_ms":40},"status":"keep","description":"baseline","timestamp":1,"segment":0}
+{"run":2,"commit":"bbbbbbb","metric":11.8,"metrics":{"compile_ms":38},"status":"keep","description":"cache tweak","timestamp":2,"segment":0}
+{"type":"config","name":"Speed up tests","metricName":"seconds","metricUnit":"s","bestDirection":"lower"}
+{"run":1,"commit":"ccccccc","metric":10.9,"metrics":{"compile_ms":34,"bundle_kb":120},"status":"keep","description":"new baseline","timestamp":3,"segment":1}
+{"run":2,"commit":"ddddddd","metric":11.4,"metrics":{"compile_ms":33,"bundle_kb":121},"status":"discard","description":"bad tradeoff","timestamp":4,"segment":1}

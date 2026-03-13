@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node", "vitest/globals"],
+    "baseUrl": ".",
+    "paths": {
+      "openclaw/plugin-sdk/core": ["./test/shims/openclaw-plugin-sdk-core.ts"]
+    }
+  },
+  "include": [
+    "extensions/openclaw-autoresearch/**/*.ts",
+    "test/**/*.ts"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "openclaw-autoresearch",
+  "name": "Autoresearch",
+  "description": "Faithful OpenClaw port of pi-autoresearch.",
+  "skills": [
+    "./skills"
+  ],
+  "version": "1.0.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
