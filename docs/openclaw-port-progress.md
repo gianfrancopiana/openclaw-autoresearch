@@ -2,7 +2,7 @@
 
 ## Status
 
-Current state: follow-up PR complete — `/autoresearch` command implemented via documented `api.registerCommand(...)`; v1 remains skill-first
+Current state: PR 10 complete — public README/install/quickstart refreshed; v1 remains a skill-first, source-faithful OpenClaw port with a thin optional `/autoresearch` command
 
 ## Current reference snapshot
 
@@ -73,8 +73,15 @@ Current state: follow-up PR complete — `/autoresearch` command implemented via
 
 ### Phase 6 — docs and parity review
 - [x] document non-parity items
-- [ ] review all divergences against upstream
-- [ ] tighten README/docs wording to reflect faithful port
+- [x] review all divergences against upstream
+- [x] tighten README/docs wording to reflect faithful port
+
+### Phase 7 — shareability + open-source hardening
+- [x] refresh top-level `README.md`
+- [x] document OpenClaw install/setup story for another user
+- [x] document quickstart and canonical repo-root workflow
+- [x] make public docs self-sufficient without private chat context
+- [x] document honest product shape, attribution, and current limits
 
 ## Blockers
 
@@ -84,4 +91,4 @@ Current state: follow-up PR complete — `/autoresearch` command implemented via
 
 ## Next recommended action
 
-- Start PR 10: refresh shareability docs and make the skill-first entry path explicit for OpenClaw users.
+- Validate the README against a clean OpenClaw install path once the repo is exercised outside this workspace.
