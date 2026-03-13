@@ -51,7 +51,7 @@ export function registerAutoresearchCommand(api: OpenClawPluginApi): void {
   });
 }
 
-function buildAutoresearchCommandText(
+export function buildAutoresearchCommandText(
   cwd: string,
   mode: "default" | "status",
 ): string {
@@ -82,7 +82,7 @@ function buildAutoresearchCommandText(
     );
   } else {
     lines.push(
-      `The canonical files exist, but the session brief looks incomplete. Open \`${AUTORESEARCH_ROOT_FILES.sessionDoc}\` and finish setup through `/skill:autoresearch-create` if needed.`,
+      `The canonical files exist, but the session brief looks incomplete. Open \`${AUTORESEARCH_ROOT_FILES.sessionDoc}\` and finish setup through \`/skill:autoresearch-create\` if needed.`,
     );
   }
 

@@ -63,6 +63,7 @@ export function createLogExperimentTool(_api: OpenClawPluginApi) {
         timestamp: Date.now(),
         segment: state.currentSegment,
       };
+      let finalExperiment = experiment;
 
       let gitSummary = "";
       let gitAction: Record<string, unknown> = {
@@ -88,7 +89,10 @@ export function createLogExperimentTool(_api: OpenClawPluginApi) {
           commit: gitResult.commit,
         };
         if (gitResult.committed) {
-          experiment.commit = gitResult.commit;
+          finalExperiment = {
+            ...experiment,
+            commit: gitResult.commit,
+          };
         }
       } else {
         const gitResult = revertTrackedChanges(ctx.cwd);
@@ -101,7 +105,7 @@ export function createLogExperimentTool(_api: OpenClawPluginApi) {
       }
 
       try {
-        appendResultEntry(ctx.cwd, experiment);
+        appendResultEntry(ctx.cwd, finalExperiment);
       } catch (error) {
         return {
           content: [
@@ -133,10 +137,10 @@ export function createLogExperimentTool(_api: OpenClawPluginApi) {
             type: "text" as const,
             text: buildResultText({
               state,
-              experiment,
+              experiment: finalExperiment,
               baselineMetric,
               baselineSecondaryMetrics,
-              totalRunCount: experiment.run,
+              totalRunCount: finalExperiment.run,
               gitSummary,
               knownSecondaryMetrics,
             }),
@@ -144,7 +148,7 @@ export function createLogExperimentTool(_api: OpenClawPluginApi) {
         ],
         details: {
           status: "ok",
-          experiment,
+          experiment: finalExperiment,
           state: nextState,
           git: gitAction,
         },
