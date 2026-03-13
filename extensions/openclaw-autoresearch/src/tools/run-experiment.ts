@@ -2,8 +2,9 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { RunExperimentParams } from "./schemas.js";
 import { executeExperimentCommand } from "../execute.js";
 import { setAutoresearchRunInFlight } from "../runtime-state.js";
+import { resolveToolCwd } from "./tool-cwd.js";
 
-export function createRunExperimentTool(_api: OpenClawPluginApi) {
+export function createRunExperimentTool(api: OpenClawPluginApi) {
   return {
     name: "run_experiment",
     label: "Run Experiment",
@@ -18,9 +19,9 @@ export function createRunExperimentTool(_api: OpenClawPluginApi) {
       },
       signal: AbortSignal,
       onUpdate: ((update: unknown) => void | Promise<void>) | undefined,
-      ctx: { cwd: string },
     ) {
-      setAutoresearchRunInFlight(ctx.cwd, true);
+      const cwd = resolveToolCwd(api);
+      setAutoresearchRunInFlight(cwd, true);
 
       if (onUpdate) {
         await onUpdate({
@@ -33,12 +34,12 @@ export function createRunExperimentTool(_api: OpenClawPluginApi) {
       try {
         details = await executeExperimentCommand({
           command: params.command,
-          cwd: ctx.cwd,
+          cwd,
           timeoutSeconds: params.timeout_seconds,
           signal,
         });
       } catch (error) {
-        setAutoresearchRunInFlight(ctx.cwd, false);
+        setAutoresearchRunInFlight(cwd, false);
         throw error;
       }
 

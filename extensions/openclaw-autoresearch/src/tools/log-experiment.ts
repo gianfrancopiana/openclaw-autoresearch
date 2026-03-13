@@ -13,8 +13,9 @@ import {
   consumeAutoresearchSteers,
   setAutoresearchRunInFlight,
 } from "../runtime-state.js";
+import { resolveToolCwd } from "./tool-cwd.js";
 
-export function createLogExperimentTool(_api: OpenClawPluginApi) {
+export function createLogExperimentTool(api: OpenClawPluginApi) {
   return {
     name: "log_experiment",
     label: "Log Experiment",
@@ -33,9 +34,9 @@ export function createLogExperimentTool(_api: OpenClawPluginApi) {
       },
       _signal: AbortSignal,
       _onUpdate: unknown,
-      ctx: { cwd: string },
     ) {
-      const state = reconstructStateFromJsonl(ctx.cwd);
+      const cwd = resolveToolCwd(api);
+      const state = reconstructStateFromJsonl(cwd);
       const secondaryMetrics = params.metrics ?? {};
 
       if (state.secondaryMetrics.length > 0) {
@@ -56,7 +57,7 @@ export function createLogExperimentTool(_api: OpenClawPluginApi) {
       }
 
       const knownSecondaryMetrics = mergeSecondaryMetrics(state.secondaryMetrics, secondaryMetrics);
-      const currentResults = readCurrentSegmentResults(ctx.cwd, state.currentSegment);
+      const currentResults = readCurrentSegmentResults(cwd, state.currentSegment);
       const experiment: AutoresearchResultEntry = {
         run: state.currentRunCount + 1,
         commit: params.commit.slice(0, 7),
@@ -77,7 +78,7 @@ export function createLogExperimentTool(_api: OpenClawPluginApi) {
 
       if (params.status === "keep") {
         const gitResult = commitKeptExperiment({
-          cwd: ctx.cwd,
+          cwd: cwd,
           description: params.description,
           metricName: state.metricName,
           metric: params.metric,
@@ -109,7 +110,7 @@ export function createLogExperimentTool(_api: OpenClawPluginApi) {
       }
 
       try {
-        appendResultEntry(ctx.cwd, finalExperiment);
+        appendResultEntry(cwd, finalExperiment);
       } catch (error) {
         return {
           content: [
@@ -133,9 +134,9 @@ export function createLogExperimentTool(_api: OpenClawPluginApi) {
         currentResults,
         knownSecondaryMetrics,
       );
-      const nextState: AutoresearchStateSnapshot = reconstructStateFromJsonl(ctx.cwd);
-      const queuedSteers = consumeAutoresearchSteers(ctx.cwd);
-      setAutoresearchRunInFlight(ctx.cwd, false);
+      const nextState: AutoresearchStateSnapshot = reconstructStateFromJsonl(cwd);
+      const queuedSteers = consumeAutoresearchSteers(cwd);
+      setAutoresearchRunInFlight(cwd, false);
 
       return {
         content: [

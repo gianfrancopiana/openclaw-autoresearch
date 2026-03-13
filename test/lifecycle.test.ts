@@ -20,6 +20,12 @@ function createAbortSignal(): AbortSignal {
   return new AbortController().signal;
 }
 
+function createApi(cwd: string) {
+  return {
+    resolvePath: vi.fn(() => cwd),
+  };
+}
+
 function readJsonl(cwd: string): Array<Record<string, unknown>> {
   const jsonlPath = getAutoresearchRootFilePath(cwd, "resultsLog");
   return fs
@@ -39,12 +45,11 @@ async function initExperiment(
     direction?: "lower" | "higher";
   },
 ) {
-  return await createInitExperimentTool({} as never).execute(
+  return await createInitExperimentTool(createApi(cwd) as never).execute(
     "tool-call",
     params,
     createAbortSignal(),
     undefined,
-    { cwd },
   );
 }
 
@@ -56,12 +61,11 @@ async function runExperiment(
   },
   onUpdate?: (update: unknown) => void | Promise<void>,
 ) {
-  return await createRunExperimentTool({} as never).execute(
+  return await createRunExperimentTool(createApi(cwd) as never).execute(
     "tool-call",
     params,
     createAbortSignal(),
     onUpdate,
-    { cwd },
   );
 }
 
@@ -76,12 +80,11 @@ async function logExperiment(
     force?: boolean;
   },
 ) {
-  return await createLogExperimentTool({} as never).execute(
+  return await createLogExperimentTool(createApi(cwd) as never).execute(
     "tool-call",
     params,
     createAbortSignal(),
     undefined,
-    { cwd },
   );
 }
 

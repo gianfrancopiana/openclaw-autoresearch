@@ -2,10 +2,11 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { Type } from "@sinclair/typebox";
 import { reconstructStateFromJsonl, type AutoresearchStateSnapshot } from "../state.js";
 import { getAutoresearchRuntimeState, type AutoresearchRuntimeSnapshot } from "../runtime-state.js";
+import { resolveToolCwd } from "./tool-cwd.js";
 
 const AutoresearchStatusParams = Type.Object({}, { additionalProperties: false });
 
-export function createAutoresearchStatusTool(_api: OpenClawPluginApi) {
+export function createAutoresearchStatusTool(api: OpenClawPluginApi) {
   return {
     name: "autoresearch_status",
     label: "Autoresearch Status",
@@ -17,10 +18,10 @@ export function createAutoresearchStatusTool(_api: OpenClawPluginApi) {
       _params: Record<string, never>,
       _signal: AbortSignal,
       _onUpdate: unknown,
-      ctx: { cwd: string },
     ) {
-      const state = reconstructStateFromJsonl(ctx.cwd);
-      const runtimeState = getAutoresearchRuntimeState(ctx.cwd);
+      const cwd = resolveToolCwd(api);
+      const state = reconstructStateFromJsonl(cwd);
+      const runtimeState = getAutoresearchRuntimeState(cwd);
 
       return {
         content: [{ type: "text" as const, text: formatAutoresearchStatusText(state, runtimeState) }],

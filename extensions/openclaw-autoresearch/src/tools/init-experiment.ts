@@ -6,8 +6,9 @@ import {
   reconstructStateFromJsonl,
   type AutoresearchStateSnapshot,
 } from "../state.js";
+import { resolveToolCwd } from "./tool-cwd.js";
 
-export function createInitExperimentTool(_api: OpenClawPluginApi) {
+export function createInitExperimentTool(api: OpenClawPluginApi) {
   return {
     name: "init_experiment",
     label: "Init Experiment",
@@ -24,9 +25,9 @@ export function createInitExperimentTool(_api: OpenClawPluginApi) {
       },
       _signal: AbortSignal,
       _onUpdate: unknown,
-      ctx: { cwd: string },
     ) {
-      const previousState = reconstructStateFromJsonl(ctx.cwd);
+      const cwd = resolveToolCwd(api);
+      const previousState = reconstructStateFromJsonl(cwd);
       const isReinit = previousState.currentRunCount > 0;
       const nextState: AutoresearchStateSnapshot = {
         ...createEmptyStateSnapshot(),
@@ -39,7 +40,7 @@ export function createInitExperimentTool(_api: OpenClawPluginApi) {
 
       try {
         writeConfigHeader(
-          ctx.cwd,
+          cwd,
           createConfigHeader({
             name: nextState.name ?? params.name,
             metricName: nextState.metricName,
