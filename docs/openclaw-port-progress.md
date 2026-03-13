@@ -2,7 +2,7 @@
 
 ## Status
 
-Current state: PR 1 complete — source contract frozen; PR 2 next
+Current state: PR 2 complete — plugin skeleton added; PR 3 next
 
 ## Current reference snapshot
 
@@ -41,9 +41,9 @@ Current state: PR 1 complete — source contract frozen; PR 2 next
 - [x] add `docs/non-parity.md`
 
 ### Phase 1 — mechanical import
-- [ ] create OpenClaw plugin skeleton
+- [x] create OpenClaw plugin skeleton
 - [ ] create OpenClaw skill skeleton
-- [ ] map upstream names/files to OpenClaw locations
+- [x] map upstream names/files to OpenClaw locations
 - [ ] decide exact `/autoresearch` command path
 
 ### Phase 2 — core tool port
@@ -80,4 +80,4 @@ Current state: PR 1 complete — source contract frozen; PR 2 next
 
 ## Next recommended action
 
-- Start PR 2: create the OpenClaw plugin skeleton without introducing provider-specific architecture.
+- Start PR 3: port `skills/autoresearch-create/SKILL.md` with minimal edits and no workflow redesign.

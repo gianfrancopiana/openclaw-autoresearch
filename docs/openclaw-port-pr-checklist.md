@@ -39,25 +39,25 @@ Goal: lock the upstream target and the porting rules before implementation drift
 Goal: create the OpenClaw plugin package in the right shape, without overbuilding.
 
 ### Deliverables
-- [ ] add plugin package / extension directory
-- [ ] add plugin manifest/config scaffolding
-- [ ] add plugin entrypoint
-- [ ] add internal module structure for:
-  - [ ] state reconstruction
-  - [ ] file IO
-  - [ ] experiment execution
-  - [ ] logging / JSONL append
-  - [ ] git actions
-- [ ] register placeholder v1 tools:
-  - [ ] `init_experiment`
-  - [ ] `run_experiment`
-  - [ ] `log_experiment`
-- [ ] optionally reserve `autoresearch_status` but do not overcommit to it
+- [x] add plugin package / extension directory
+- [x] add plugin manifest/config scaffolding
+- [x] add plugin entrypoint
+- [x] add internal module structure for:
+  - [x] state reconstruction
+  - [x] file IO
+  - [x] experiment execution
+  - [x] logging / JSONL append
+  - [x] git actions
+- [x] register placeholder v1 tools:
+  - [x] `init_experiment`
+  - [x] `run_experiment`
+  - [x] `log_experiment`
+- [x] consciously defer `autoresearch_status` in the skeleton to keep the v1 surface minimal
 
 ### Review bar
-- [ ] plugin shape follows existing OpenClaw patterns
-- [ ] no provider-specific runner is introduced as architecture
-- [ ] no hidden `.autoresearch/` redesign appears
+- [x] plugin shape follows existing OpenClaw patterns
+- [x] no provider-specific runner is introduced as architecture
+- [x] no hidden `.autoresearch/` redesign appears
 
 ---
 
