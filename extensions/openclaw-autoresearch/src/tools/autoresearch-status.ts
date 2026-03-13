@@ -21,7 +21,7 @@ export function createAutoresearchStatusTool(_api: OpenClawPluginApi) {
       const state = reconstructStateFromJsonl(ctx.cwd);
 
       return {
-        content: [{ type: "text" as const, text: renderStatusText(state) }],
+        content: [{ type: "text" as const, text: formatAutoresearchStatusText(state) }],
         details: {
           status: "ok",
           state,
@@ -31,7 +31,7 @@ export function createAutoresearchStatusTool(_api: OpenClawPluginApi) {
   };
 }
 
-function renderStatusText(state: AutoresearchStateSnapshot): string {
+export function formatAutoresearchStatusText(state: AutoresearchStateSnapshot): string {
   const lines = [
     `Mode: ${state.mode}`,
     `Session doc: ${state.hasSessionDoc ? "present" : "missing"}`,

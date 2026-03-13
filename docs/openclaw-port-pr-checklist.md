@@ -185,13 +185,15 @@ Goal: add the command only if it stays thin and source-faithful.
 
 ### Deliverables
 - [x] inspect whether the local OpenClaw plugin surface exposes a clean command registration path
-- [x] keep `/autoresearch` deferred when command support is ambiguous in this workspace
-- [x] otherwise explicitly document that v1 is skill-first
+- [x] implement `/autoresearch` via documented `api.registerCommand(...)`
+- [x] keep the command thin and explicitly skill-first
+- [x] detect canonical root-level session files and route users to setup or resume guidance
+- [x] point users back to `autoresearch.md` instead of creating a second UI
 
 Notes:
-- PR 9 intentionally does not add a command implementation. In this workspace, the available plugin code only demonstrates `registerTool(...)` and a guarded `registerHook(...)` escape hatch used in PR 8.
-- No documented `registerCommand(...)` API, no local OpenClaw SDK package/type source, and no in-repo OpenClaw command example are available to implement against without brittle API guessing.
-- Because the plan explicitly prefers defer-over-invention when command support is awkward, v1 remains skill-first: use `autoresearch-create`, then resume from the canonical root files with `autoresearch.md` as the primary guide.
+- The original defer rationale is now obsolete. Host docs at `/app/docs/tools/plugin.md` document `api.registerCommand(...)`, and `/app/extensions/device-pair/index.ts` provides a real in-tree example.
+- This follow-up therefore implements `/autoresearch` as a thin text command: it checks for canonical repo-root files, reports a terse status when asked, and directs setup or resume back through `autoresearch.md` and `autoresearch-create`.
+- The command remains optional polish, not architecture. The product entry path is still the skill plus canonical root files.
 
 ### Review bar
 - [x] command is optional polish, not architecture

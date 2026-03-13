@@ -10,6 +10,7 @@ import { createRunExperimentTool } from "./src/tools/run-experiment.js";
 import { createLogExperimentTool } from "./src/tools/log-experiment.js";
 import { createAutoresearchStatusTool } from "./src/tools/autoresearch-status.js";
 import { registerAutoresearchHooks } from "./src/hooks.js";
+import { registerAutoresearchCommand } from "./src/commands/autoresearch.js";
 
 const plugin = {
   id: AUTORESEARCH_PLUGIN_ID,
@@ -18,6 +19,7 @@ const plugin = {
   configSchema: autoresearchPluginConfigSchema,
   register(api: OpenClawPluginApi) {
     registerAutoresearchHooks(api);
+    registerAutoresearchCommand(api);
     api.registerTool(createInitExperimentTool(api));
     api.registerTool(createRunExperimentTool(api));
     api.registerTool(createLogExperimentTool(api));
