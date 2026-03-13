@@ -1,134 +1,187 @@
-# pi-autoresearch — autonomous experiment loop for pi
+# openclaw-autoresearch
 
-**[Install](#install)** · **[Usage](#usage)** · **[How it works](#how-it-works)**
+Faithful OpenClaw port of [`davebcn87/pi-autoresearch`](https://github.com/davebcn87/pi-autoresearch).
 
-*Try an idea, measure it, keep what works, discard what doesn't, repeat forever.*
+This repo keeps the upstream product shape intact where OpenClaw allows:
 
-Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch). Works for any optimization target: test speed, bundle size, LLM training, build times, Lighthouse scores.
+- skill-first setup and resume via `autoresearch-create`
+- canonical repo-root files:
+  - `autoresearch.md`
+  - `autoresearch.sh`
+  - `autoresearch.jsonl`
+  - `autoresearch.ideas.md`
+- the core tools:
+  - `init_experiment`
+  - `run_experiment`
+  - `log_experiment`
+- `/autoresearch` as a thin optional command, not a second UI
 
----
+It is not a 1:1 port of Pi's widget/dashboard runtime. The contract here is semantic fidelity, not Pi UI parity.
 
-![pi-autoresearch dashboard](pi-autoresearch.png)
+## What It Does
 
----
+Autoresearch runs an autonomous experiment loop for any optimization target:
 
-## What's included
+`edit -> run benchmark -> log result -> keep/discard/crash -> repeat`
 
-| | |
-|---|---|
-| **Extension** | Tools + live widget + `/autoresearch` dashboard |
-| **Skill** | Gathers what to optimize, writes session files, starts the loop |
+Typical uses:
 
-### Extension tools
+- speed up tests or builds
+- reduce bundle size
+- tune benchmark scripts
+- iterate on training or evaluation workloads
 
-| Tool | Description |
-|------|-------------|
-| `init_experiment` | One-time session config — name, metric, unit, direction |
-| `run_experiment` | Runs any command, times wall-clock duration, captures output |
-| `log_experiment` | Records result, auto-commits, updates widget and dashboard |
+The extension supplies durable experiment tools. The skill gathers setup context, writes the root files, and starts the loop.
 
-### UI
+## Repository Layout
 
-- **Status widget** — always visible above the editor: `🔬 autoresearch 12 runs 8 kept │ best: 42.3s`
-- **`/autoresearch`** — full results dashboard (`Ctrl+X` to toggle, `Escape` to close)
-
-### Skill
-
-`autoresearch-create` asks a few questions (or infers from context) about your goal, command, metric, and files in scope — then writes two files and starts the loop immediately:
-
-| File | Purpose |
-|------|---------|
-| `autoresearch.md` | Session document — objective, metrics, files in scope, what's been tried. A fresh agent can resume from this alone. |
-| `autoresearch.sh` | Benchmark script — pre-checks, runs the workload, outputs `METRIC name=number` lines. |
-
----
+- `extensions/openclaw-autoresearch/`: OpenClaw plugin implementation
+- `skills/autoresearch-create/`: primary user entry path
+- `openclaw.plugin.json`: plugin manifest, including bundled skills
+- `docs/upstream-parity-map.md`: upstream contract and copy/adapt/defer map
+- `docs/non-parity.md`: honest non-parity notes vs Pi
 
 ## Install
 
-```bash
-pi install https://github.com/davebcn87/pi-autoresearch
+Prerequisites:
+
+- a working OpenClaw installation
+- access to your OpenClaw config and plugin load paths
+- `git` available in the repo you want to optimize
+
+### Option A: load this repo directly during development
+
+OpenClaw's plugin docs support loading plugins from an extension directory or `plugins.load.paths`. Point OpenClaw at this repo, then restart the gateway.
+
+Example config shape:
+
+```yaml
+plugins:
+  load:
+    paths:
+      - /absolute/path/to/openclaw-autoresearch
+  entries:
+    autoresearch:
+      enabled: true
 ```
 
-<details>
-<summary>Manual install</summary>
+OpenClaw discovers `openclaw.plugin.json`, loads `extensions/openclaw-autoresearch/index.ts`, and exposes the bundled `skills/autoresearch-create` skill.
 
-```bash
-cp -r extensions/pi-autoresearch ~/.pi/agent/extensions/
-cp -r skills/autoresearch-create ~/.pi/agent/skills/
-```
+### Option B: copy into managed plugin/skill locations
 
-Then `/reload` in pi.
+If you prefer manual installation, copy this repo into one of your OpenClaw plugin discovery locations, or copy the relevant pieces into your managed locations:
 
-</details>
+- plugin root containing `openclaw.plugin.json`
+- `extensions/openclaw-autoresearch/`
+- `skills/autoresearch-create/`
 
----
+Then restart OpenClaw and verify the plugin is loaded.
 
-## Usage
+### Verify install
 
-### 1. Start autoresearch
+After restart, confirm all three surfaces are available:
 
-```
-/skill:autoresearch-create
-```
+- skill: `autoresearch-create`
+- tools: `init_experiment`, `run_experiment`, `log_experiment`
+- command: `/autoresearch`
 
-The agent asks about your goal, command, metric, and files in scope — or infers them from context. It then creates a branch, writes `autoresearch.md` and `autoresearch.sh`, runs the baseline, and starts looping immediately.
+## Quickstart
 
-### 2. The loop
+In the repo you want to optimize:
 
-The agent runs autonomously: edit → commit → `run_experiment` → `log_experiment` → keep or revert → repeat. It never stops unless interrupted.
+1. Load this plugin in OpenClaw.
+2. Start the skill with `/skill:autoresearch-create`.
+3. Answer the setup questions:
+   - optimization goal
+   - benchmark command
+   - primary metric and direction
+   - files in scope
+   - constraints
+4. Let the skill create the branch and root files.
+5. Review `autoresearch.md` and `autoresearch.sh`.
+6. Continue the loop. The agent should use `run_experiment` and `log_experiment` against the canonical root files.
 
-Every result is appended to `autoresearch.jsonl` in your project — one line per run. This means:
+The session state lives in files at the repo root. A fresh agent should be able to resume from those files alone.
 
-- **Survives restarts** — the agent can resume a session by reading the file
-- **Survives context resets** — `autoresearch.md` captures what's been tried so a fresh agent has full context
-- **Human readable** — open it anytime to see the full history
-- **Branch-aware** — each branch has its own session
+## Daily Use
 
-### 3. Monitor progress
+Primary path:
 
-- **Widget** — always visible above the editor
-- **`/autoresearch`** — full dashboard with results table and best run
-- **`Escape`** — interrupt anytime and ask for a summary
+- start or resume through `/skill:autoresearch-create`
+- treat `autoresearch.md` as the canonical session brief
 
----
+Optional helper:
 
-## Example domains
+- `/autoresearch`
+- `/autoresearch status`
 
-| Domain | Metric | Command |
-|--------|--------|---------|
-| Test speed | seconds ↓ | `pnpm test` |
-| Bundle size | KB ↓ | `pnpm build && du -sb dist` |
-| LLM training | val_bpb ↓ | `uv run train.py` |
-| Build speed | seconds ↓ | `pnpm build` |
-| Lighthouse | perf score ↑ | `lighthouse http://localhost:3000 --output=json` |
+The command is intentionally thin. It detects canonical root files, reports terse status, and points the agent back to `autoresearch.md`. It is not a dashboard replacement.
 
----
+## Canonical Root Files
 
-## How it works
+These files are user-facing and preserved at repo root in v1:
 
-The **extension** is domain-agnostic infrastructure. The **skill** encodes domain knowledge. This separation means one extension serves unlimited domains.
+- `autoresearch.md`: session brief, scope, constraints, and accumulated learnings
+- `autoresearch.sh`: benchmark entrypoint; should emit `METRIC name=number` lines
+- `autoresearch.jsonl`: append-only run ledger and baseline segments
+- `autoresearch.ideas.md`: backlog for promising ideas worth revisiting later
 
-```
-┌──────────────────────┐     ┌──────────────────────────┐
-│  Extension (global)  │     │  Skill (per-domain)       │
-│                      │     │                           │
-│  run_experiment      │◄────│  command: pnpm test       │
-│  log_experiment      │     │  metric: seconds (lower)  │
-│  widget + dashboard  │     │  scope: vitest configs    │
-│                      │     │  ideas: pool, parallel…   │
-└──────────────────────┘     └──────────────────────────┘
-```
+This repo does not move the canonical session state under hidden plugin storage.
 
-Two files keep the session alive across restarts and context resets:
+## Current Product Shape
 
-```
-autoresearch.jsonl   — append-only log of every run (metric, status, commit, description)
-autoresearch.md      — living document: objective, what's been tried, dead ends, key wins
-```
+This repository should be described as:
 
-A fresh agent with no memory can read these two files and continue exactly where the previous session left off.
+> a faithful OpenClaw port of `pi-autoresearch`, with a skill-first entry path, canonical repo-root session files, and a thin optional `/autoresearch` command
 
----
+That means:
+
+- the upstream extension + skill split is preserved
+- the upstream file and tool names are preserved
+- file-first resumability is preserved
+- OpenClaw-specific code is limited to plugin registration, hooks, and the thin command surface
+
+## Known Non-Parity Vs Pi
+
+Current intentional non-parity:
+
+- no Pi-style always-visible widget above the editor
+- no fullscreen dashboard or TUI parity
+- no `Ctrl+X`, `Escape`, or other Pi-specific editor shortcuts
+- different hook names and runtime plumbing under OpenClaw
+- `/autoresearch` is text-first and optional, not the primary UX
+
+Non-parity is documented in [`docs/non-parity.md`](docs/non-parity.md). The full upstream copy/adapt/defer map lives in [`docs/upstream-parity-map.md`](docs/upstream-parity-map.md).
+
+## Upstream Attribution And Tracking
+
+Source project:
+
+- upstream repo: `https://github.com/davebcn87/pi-autoresearch`
+- pinned upstream commit for this port: `2227029fa5712944a36938b5fe59f709cb30ed22` (`2227029f`)
+
+Tracking docs in this repo:
+
+- `docs/upstream-parity-map.md`
+- `docs/non-parity.md`
+- `docs/openclaw-port-progress.md`
+
+The goal is to keep future diffs against upstream understandable instead of silently redesigning the product.
+
+## Status And Limits
+
+What is here now:
+
+- the three core tools are implemented
+- skill-first start/resume is implemented
+- `/autoresearch` exists as a thin optional command
+- minimal OpenClaw hook integration exists
+
+What is not here:
+
+- Pi dashboard/widget parity
+- brittle queued-steer or agent-end continuation behavior
+- any provider-specific runner as the product identity
 
 ## License
 

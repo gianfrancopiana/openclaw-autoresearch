@@ -206,17 +206,17 @@ Notes:
 Goal: make it easy for another OpenClaw user to install and understand.
 
 ### Deliverables
-- [ ] write/refresh top-level `README.md`
-- [ ] add install instructions
-- [ ] add quickstart instructions
-- [ ] document non-parity vs Pi honestly
-- [ ] document upstream attribution and tracking
-- [ ] ensure no private local assumptions remain in docs or config
+- [x] write/refresh top-level `README.md`
+- [x] add install instructions
+- [x] add quickstart instructions
+- [x] document non-parity vs Pi honestly
+- [x] document upstream attribution and tracking
+- [x] ensure no private local assumptions remain in docs or config
 
 ### Review bar
-- [ ] another OpenClaw user can adopt it without your local setup
-- [ ] repo reads like a standalone product, not a personal experiment
-- [ ] no provider-specific branding has become the identity
+- [x] another OpenClaw user can adopt it without your local setup
+- [x] repo reads like a standalone product, not a personal experiment
+- [x] no provider-specific branding has become the identity
 
 ---
 
