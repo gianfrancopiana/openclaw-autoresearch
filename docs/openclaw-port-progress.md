@@ -2,7 +2,7 @@
 
 ## Status
 
-Current state: PR 10 complete — public README/install/quickstart refreshed; v1 remains a skill-first, source-faithful OpenClaw port with a thin optional `/autoresearch` command
+Current state: PR 11 complete — final parity review documented; v1 remains a skill-first, source-faithful OpenClaw port with canonical repo-root files, preserved tool names, and explicitly deferred Pi-only UI/runtime gaps
 
 ## Current reference snapshot
 
@@ -75,6 +75,9 @@ Current state: PR 10 complete — public README/install/quickstart refreshed; v1
 - [x] document non-parity items
 - [x] review all divergences against upstream
 - [x] tighten README/docs wording to reflect faithful port
+- [x] add a concise final parity review doc
+- [x] confirm root-level file contract, tool names, and skill-first UX stayed intact
+- [x] explicitly defer remaining Pi-only UI/runtime gaps in-versioned docs
 
 ### Phase 7 — shareability + open-source hardening
 - [x] refresh top-level `README.md`

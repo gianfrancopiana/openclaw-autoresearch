@@ -152,6 +152,7 @@ Current intentional non-parity:
 - `/autoresearch` is text-first and optional, not the primary UX
 
 Non-parity is documented in [`docs/non-parity.md`](docs/non-parity.md). The full upstream copy/adapt/defer map lives in [`docs/upstream-parity-map.md`](docs/upstream-parity-map.md).
+The final PR 11 audit is summarized in [`docs/final-parity-review.md`](docs/final-parity-review.md).
 
 ## Upstream Attribution And Tracking
 
@@ -164,6 +165,7 @@ Tracking docs in this repo:
 
 - `docs/upstream-parity-map.md`
 - `docs/non-parity.md`
+- `docs/final-parity-review.md`
 - `docs/openclaw-port-progress.md`
 
 The goal is to keep future diffs against upstream understandable instead of silently redesigning the product.
