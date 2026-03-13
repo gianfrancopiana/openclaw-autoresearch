@@ -4,6 +4,12 @@
 
 Current state: planning / source capture
 
+## Current reference snapshot
+
+- Plan reference name: `AR-PORT-2026-03-13-A`
+- Full plan snapshot: `docs/plan-snapshots/AR-PORT-2026-03-13-A.md`
+- PR checklist: `docs/openclaw-port-pr-checklist.md`
+
 ## Repository strategy
 
 - Local repo path: `/home/node/.openclaw/workspace/projects/openclaw-autoresearch`
