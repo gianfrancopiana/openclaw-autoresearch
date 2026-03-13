@@ -124,18 +124,18 @@ Goal: faithfully execute the benchmark command and capture the result contract.
 Goal: preserve the core loop semantics that make the product what it is.
 
 ### Deliverables
-- [ ] implement `log_experiment`
-- [ ] append run entry to `autoresearch.jsonl`
-- [ ] preserve `keep` behavior
-- [ ] preserve `discard` behavior
-- [ ] preserve `crash` behavior
-- [ ] preserve commit/revert semantics closely to upstream
-- [ ] keep secondary metrics in the logged payload
+- [x] implement `log_experiment`
+- [x] append run entry to `autoresearch.jsonl`
+- [x] preserve `keep` behavior
+- [x] preserve `discard` behavior
+- [x] preserve `crash` behavior
+- [x] preserve commit/revert semantics closely to upstream
+- [x] keep secondary metrics in the logged payload
 
 ### Review bar
-- [ ] append-only log remains the source of truth
-- [ ] keep/discard/crash semantics match upstream closely
-- [ ] no “cleaner” behavior change sneaks in here
+- [x] append-only log remains the source of truth
+- [x] keep/discard/crash semantics match upstream closely
+- [x] no “cleaner” behavior change sneaks in here
 
 ---
 

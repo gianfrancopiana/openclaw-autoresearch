@@ -37,3 +37,19 @@ export function writeConfigHeader(
   }
   fs.writeFileSync(jsonlPath, line);
 }
+
+export type AutoresearchResultEntry = {
+  readonly run: number;
+  readonly commit: string;
+  readonly metric: number;
+  readonly metrics: Record<string, number>;
+  readonly status: "keep" | "discard" | "crash";
+  readonly description: string;
+  readonly timestamp: number;
+  readonly segment: number;
+};
+
+export function appendResultEntry(cwd: string, entry: AutoresearchResultEntry): void {
+  const jsonlPath = getAutoresearchRootFilePath(cwd, "resultsLog");
+  fs.appendFileSync(jsonlPath, `${JSON.stringify(entry)}\n`);
+}

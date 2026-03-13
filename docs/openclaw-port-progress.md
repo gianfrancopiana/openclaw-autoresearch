@@ -2,7 +2,7 @@
 
 ## Status
 
-Current state: PR 5 complete — `run_experiment` parity landed; PR 6 next
+Current state: PR 6 complete — `log_experiment` parity landed; PR 7 next
 
 ## Current reference snapshot
 
@@ -49,7 +49,7 @@ Current state: PR 5 complete — `run_experiment` parity landed; PR 6 next
 ### Phase 2 — core tool port
 - [x] port `init_experiment`
 - [x] port `run_experiment`
-- [ ] port `log_experiment`
+- [x] port `log_experiment`
 - [x] preserve root-level `autoresearch.jsonl` behavior
 - [x] preserve config-header / segment behavior
 
@@ -75,9 +75,9 @@ Current state: PR 5 complete — `run_experiment` parity landed; PR 6 next
 
 ## Blockers
 
-- None currently for PR 5.
+- None currently for PR 6.
 - GitHub remote now exists at `gianfrancopiana/openclaw-autoresearch`; collaborator access is being used via the current local auth context.
 
 ## Next recommended action
 
-- Start PR 6: implement `log_experiment` with faithful keep/discard/crash logging semantics.
+- Start PR 7: reconstruct state from `autoresearch.jsonl` for resume behavior and validate file-first resumability.
