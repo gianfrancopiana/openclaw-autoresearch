@@ -118,4 +118,67 @@ describe("autoresearch tools", () => {
     expect(result.details).toMatchObject({ status: "ok" });
     expect(result.content[0]?.text).toContain("Logged #1: discard - baseline");
   });
+
+  it("supports explicit cwd overrides for nested repo tool execution", async () => {
+    const workspaceCwd = createTempDir();
+    const repoCwd = createTempDir();
+    const api = createApi(workspaceCwd);
+
+    const initResult = await createInitExperimentTool(api as never).execute(
+      "call-1",
+      {
+        cwd: repoCwd,
+        name: "Nested repo robustness",
+        metric_name: "escaped_mutations",
+        metric_unit: "",
+        direction: "lower",
+      },
+      new AbortController().signal,
+      undefined,
+    );
+
+    expect(initResult.details).toMatchObject({ status: "ok" });
+    expect(api.resolvePath).not.toHaveBeenCalled();
+    expect(fs.existsSync(path.join(repoCwd, AUTORESEARCH_ROOT_FILES.resultsLog))).toBe(true);
+    expect(fs.existsSync(path.join(workspaceCwd, AUTORESEARCH_ROOT_FILES.resultsLog))).toBe(false);
+
+    const runResult = await createRunExperimentTool(api as never).execute(
+      "call-2",
+      {
+        cwd: repoCwd,
+        command: "node -e \"console.log(process.cwd())\"",
+        timeout_seconds: 10,
+      },
+      new AbortController().signal,
+      undefined,
+    );
+
+    expect(runResult.details).toMatchObject({ passed: true, timedOut: false });
+    expect(runResult.details.stdout.trim()).toBe(repoCwd);
+
+    const statusResult = await createAutoresearchStatusTool(api as never).execute(
+      "call-3",
+      { cwd: repoCwd },
+      new AbortController().signal,
+      undefined,
+    );
+
+    expect(statusResult.content[0]?.text).toContain("Session: Nested repo robustness");
+
+    const logResult = await createLogExperimentTool(api as never).execute(
+      "call-4",
+      {
+        cwd: repoCwd,
+        commit: "abc1234",
+        metric: 5,
+        status: "discard",
+        description: "baseline",
+      },
+      new AbortController().signal,
+      undefined,
+    );
+
+    expect(logResult.details).toMatchObject({ status: "ok" });
+    expect(logResult.content[0]?.text).toContain("Logged #1: discard - baseline");
+  });
 });

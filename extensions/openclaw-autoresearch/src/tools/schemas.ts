@@ -1,6 +1,14 @@
 import { Type } from "@sinclair/typebox";
 
+const CwdParam = Type.Optional(
+  Type.String({
+    description:
+      "Optional working directory for repo-local autoresearch state. Use this when the tool call originates outside the target repo session cwd.",
+  }),
+);
+
 export const InitExperimentParams = Type.Object({
+  cwd: CwdParam,
   name: Type.String({
     description:
       'Human-readable name for this experiment session (e.g. "Optimizing liquid for fastest execution and parsing")',
@@ -24,6 +32,7 @@ export const InitExperimentParams = Type.Object({
 });
 
 export const RunExperimentParams = Type.Object({
+  cwd: CwdParam,
   command: Type.String({
     description: "Shell command to run (e.g. 'pnpm test:vitest', 'uv run train.py')",
   }),
@@ -35,6 +44,7 @@ export const RunExperimentParams = Type.Object({
 });
 
 export const LogExperimentParams = Type.Object({
+  cwd: CwdParam,
   commit: Type.String({ description: "Git commit hash (short, 7 chars)" }),
   metric: Type.Number({
     description:

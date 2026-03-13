@@ -48,7 +48,20 @@ export function commitKeptExperiment(options: {
   };
   const commitMessage = `${options.description}\n\nResult: ${JSON.stringify(resultData)}`;
 
-  const addResult = runGitCommand(options.cwd, ["add", "-A"]);
+  const repoRootResult = runGitCommand(options.cwd, ["rev-parse", "--show-toplevel"]);
+  if (repoRootResult.code !== 0 || repoRootResult.stdout.trim().length === 0) {
+    return {
+      attempted: true,
+      committed: false,
+      commit: options.commit,
+      summary: `Git repo check failed${formatExit(repoRootResult.code)}: ${truncateOutput(repoRootResult.combinedOutput)}`,
+      command: repoRootResult,
+    };
+  }
+
+  const repoRoot = repoRootResult.stdout.trim();
+
+  const addResult = runGitCommand(repoRoot, ["add", "-A"]);
   if (addResult.code !== 0) {
     return {
       attempted: true,
@@ -59,7 +72,7 @@ export function commitKeptExperiment(options: {
     };
   }
 
-  const diffResult = runGitCommand(options.cwd, ["diff", "--cached", "--quiet"]);
+  const diffResult = runGitCommand(repoRoot, ["diff", "--cached", "--quiet"]);
   if (diffResult.code === 0) {
     return {
       attempted: true,
@@ -79,7 +92,7 @@ export function commitKeptExperiment(options: {
     };
   }
 
-  const commitResult = runGitCommand(options.cwd, ["commit", "-m", commitMessage]);
+  const commitResult = runGitCommand(repoRoot, ["commit", "-m", commitMessage]);
   if (commitResult.code !== 0) {
     return {
       attempted: true,
@@ -90,7 +103,7 @@ export function commitKeptExperiment(options: {
     };
   }
 
-  const revParseResult = runGitCommand(options.cwd, ["rev-parse", "--short=7", "HEAD"]);
+  const revParseResult = runGitCommand(repoRoot, ["rev-parse", "--short=7", "HEAD"]);
   const actualCommit =
     revParseResult.code === 0 && revParseResult.stdout.trim().length >= 7
       ? revParseResult.stdout.trim().slice(0, 7)

@@ -14,13 +14,14 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
     async execute(
       _toolCallId: string,
       params: {
+        cwd?: string;
         command: string;
         timeout_seconds?: number;
       },
       signal: AbortSignal,
       onUpdate: ((update: unknown) => void | Promise<void>) | undefined,
     ) {
-      const cwd = resolveToolCwd(api);
+      const cwd = resolveToolCwd(api, params.cwd);
       setAutoresearchRunInFlight(cwd, true);
 
       if (onUpdate) {

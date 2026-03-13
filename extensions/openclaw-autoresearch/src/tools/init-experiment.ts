@@ -18,6 +18,7 @@ export function createInitExperimentTool(api: OpenClawPluginApi) {
     async execute(
       _toolCallId: string,
       params: {
+        cwd?: string;
         name: string;
         metric_name: string;
         metric_unit?: string;
@@ -26,7 +27,7 @@ export function createInitExperimentTool(api: OpenClawPluginApi) {
       _signal: AbortSignal,
       _onUpdate: unknown,
     ) {
-      const cwd = resolveToolCwd(api);
+      const cwd = resolveToolCwd(api, params.cwd);
       const previousState = reconstructStateFromJsonl(cwd);
       const isReinit = previousState.currentRunCount > 0;
       const nextState: AutoresearchStateSnapshot = {

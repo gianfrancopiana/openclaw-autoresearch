@@ -25,6 +25,7 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
     async execute(
       _toolCallId: string,
       params: {
+        cwd?: string;
         commit: string;
         metric: number;
         status: "keep" | "discard" | "crash";
@@ -35,7 +36,7 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
       _signal: AbortSignal,
       _onUpdate: unknown,
     ) {
-      const cwd = resolveToolCwd(api);
+      const cwd = resolveToolCwd(api, params.cwd);
       const state = reconstructStateFromJsonl(cwd);
       const secondaryMetrics = params.metrics ?? {};
 

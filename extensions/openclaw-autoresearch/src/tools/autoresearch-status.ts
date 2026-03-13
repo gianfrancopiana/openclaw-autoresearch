@@ -4,7 +4,17 @@ import { reconstructStateFromJsonl, type AutoresearchStateSnapshot } from "../st
 import { getAutoresearchRuntimeState, type AutoresearchRuntimeSnapshot } from "../runtime-state.js";
 import { resolveToolCwd } from "./tool-cwd.js";
 
-const AutoresearchStatusParams = Type.Object({}, { additionalProperties: false });
+const AutoresearchStatusParams = Type.Object(
+  {
+    cwd: Type.Optional(
+      Type.String({
+        description:
+          "Optional working directory for repo-local autoresearch state. Use this when the tool call originates outside the target repo session cwd.",
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
 
 export function createAutoresearchStatusTool(api: OpenClawPluginApi) {
   return {
@@ -15,11 +25,13 @@ export function createAutoresearchStatusTool(api: OpenClawPluginApi) {
     parameters: AutoresearchStatusParams,
     async execute(
       _toolCallId: string,
-      _params: Record<string, never>,
+      params: {
+        cwd?: string;
+      },
       _signal: AbortSignal,
       _onUpdate: unknown,
     ) {
-      const cwd = resolveToolCwd(api);
+      const cwd = resolveToolCwd(api, params.cwd);
       const state = reconstructStateFromJsonl(cwd);
       const runtimeState = getAutoresearchRuntimeState(cwd);
 

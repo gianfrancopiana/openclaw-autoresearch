@@ -16,6 +16,8 @@ Three tools drive the loop:
 | `run_experiment` | Executes a shell command, times it, captures stdout/stderr, returns pass/fail via exit code. |
 | `log_experiment` | Records the result. `keep` auto-commits to git. `discard`/`crash` log without committing. Tracks secondary metrics alongside the primary. |
 
+Each tool also accepts an optional `cwd` so callers can target a nested repo explicitly instead of relying on the current session working directory.
+
 All state lives in four repo-root files:
 
 | File | Purpose |
