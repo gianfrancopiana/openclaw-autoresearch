@@ -2,7 +2,7 @@
 
 ## Status
 
-Current state: PR 2 complete — plugin skeleton added; PR 3 next
+Current state: PR 3 complete — skill port landed; PR 4 next
 
 ## Current reference snapshot
 
@@ -42,7 +42,7 @@ Current state: PR 2 complete — plugin skeleton added; PR 3 next
 
 ### Phase 1 — mechanical import
 - [x] create OpenClaw plugin skeleton
-- [ ] create OpenClaw skill skeleton
+- [x] create OpenClaw skill skeleton
 - [x] map upstream names/files to OpenClaw locations
 - [ ] decide exact `/autoresearch` command path
 
@@ -75,9 +75,9 @@ Current state: PR 2 complete — plugin skeleton added; PR 3 next
 
 ## Blockers
 
-- None currently for PR 2.
+- None currently for PR 3.
 - GitHub remote now exists at `gianfrancopiana/openclaw-autoresearch`; collaborator access is being used via the current local auth context.
 
 ## Next recommended action
 
-- Start PR 3: port `skills/autoresearch-create/SKILL.md` with minimal edits and no workflow redesign.
+- Start PR 4: implement `init_experiment` with faithful root-file and JSONL segment semantics.

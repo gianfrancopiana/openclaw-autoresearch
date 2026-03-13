@@ -66,19 +66,19 @@ Goal: create the OpenClaw plugin package in the right shape, without overbuildin
 Goal: port `autoresearch-create` closely before changing behavior.
 
 ### Deliverables
-- [ ] add `skills/autoresearch-create/SKILL.md`
-- [ ] preserve upstream structure and wording wherever practical
+- [x] add `skills/autoresearch-create/SKILL.md`
+- [x] preserve upstream structure and wording wherever practical
 - [ ] adapt only:
-  - [ ] tool invocation syntax
-  - [ ] Pi-only dashboard/widget references
-  - [ ] any host-specific lifecycle wording
-- [ ] keep skill-first UX as the main entry path
-- [ ] document any unavoidable wording divergence inline
+  - [x] tool invocation syntax
+  - [x] Pi-only dashboard/widget references
+  - [x] any host-specific lifecycle wording
+- [x] keep skill-first UX as the main entry path
+- [x] document any unavoidable wording divergence inline
 
 ### Review bar
-- [ ] skill still clearly feels like upstream `autoresearch-create`
-- [ ] “never stop” loop framing remains intact
-- [ ] no provider/runtime branding leaks into the skill
+- [x] skill still clearly feels like upstream `autoresearch-create`
+- [x] “never stop” loop framing remains intact
+- [x] no provider/runtime branding leaks into the skill
 
 ---
 

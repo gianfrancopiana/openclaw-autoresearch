@@ -11,7 +11,7 @@ Autonomous experiment loop: try ideas, keep what works, discard what doesn't, ne
 
 - **`init_experiment`** — configure session (name, metric, unit, direction). Call again to re-initialize with a new baseline when the optimization target changes.
 - **`run_experiment`** — runs command, times it, captures output.
-- **`log_experiment`** — records result. `keep` auto-commits. `discard`/`crash` → `git checkout -- .` to revert. Always include secondary `metrics` dict. Dashboard: ctrl+x.
+- **`log_experiment`** — records result. `keep` auto-commits. `discard`/`crash` → `git checkout -- .` to revert. Always include secondary `metrics` dict.
 
 ## Setup
 
@@ -86,4 +86,4 @@ When there is no `autoresearch.ideas.md` file and the loop ends, the research is
 
 ## User Steers
 
-User messages sent while an experiment is running are **automatically queued** and delivered to you after your next `log_experiment` call. Finish your current experiment first — don't stop or ask for confirmation. Incorporate the user's idea in the next experiment.
+If the user sends a steer while an experiment is running, finish the current experiment first, then incorporate the user's idea in the next experiment. Don't stop mid-experiment or ask for confirmation unless the user explicitly interrupts the loop.
