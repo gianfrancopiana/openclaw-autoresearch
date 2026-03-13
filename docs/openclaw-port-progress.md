@@ -2,7 +2,7 @@
 
 ## Status
 
-Current state: PR 8 complete — minimal autoresearch hook landed; PR 9 next
+Current state: PR 9 complete — `/autoresearch` command deferred; v1 remains skill-first
 
 ## Current reference snapshot
 
@@ -44,7 +44,7 @@ Current state: PR 8 complete — minimal autoresearch hook landed; PR 9 next
 - [x] create OpenClaw plugin skeleton
 - [x] create OpenClaw skill skeleton
 - [x] map upstream names/files to OpenClaw locations
-- [ ] decide exact `/autoresearch` command path
+- [x] decide exact `/autoresearch` command path
 
 ### Phase 2 — core tool port
 - [x] port `init_experiment`
@@ -59,9 +59,9 @@ Current state: PR 8 complete — minimal autoresearch hook landed; PR 9 next
 - [x] validate file-first resumability
 
 ### Phase 4 — entry surface
-- [ ] implement skill-first start/resume flow
-- [ ] add `/autoresearch` if it maps cleanly
-- [ ] document fallback if command surface differs
+- [x] implement skill-first start/resume flow
+- [x] evaluate `/autoresearch` command path
+- [x] document fallback if command surface differs
 
 ### Phase 5 — non-core conveniences
 - [x] add lightweight status/readout
@@ -78,8 +78,9 @@ Current state: PR 8 complete — minimal autoresearch hook landed; PR 9 next
 ## Blockers
 
 - No stable OpenClaw hook example or SDK source is present in this workspace beyond tool registration imports, so PR 8 limits itself to a conservative `before_agent_start` registration path and documents the rest as deferred.
+- PR 9 inspected the local plugin surface and found no documented `registerCommand` path, no OpenClaw SDK package in the workspace, and no in-repo command example to follow. `/autoresearch` is therefore deferred in v1 rather than implemented via API guessing; the entry surface remains the `autoresearch-create` skill plus root-file resume.
 - GitHub remote now exists at `gianfrancopiana/openclaw-autoresearch`; collaborator access is being used via the current local auth context.
 
 ## Next recommended action
 
-- Start PR 9: add `/autoresearch` only if the command surface is as clean as the hook surface used in PR 8.
+- Start PR 10: refresh shareability docs and make the skill-first entry path explicit for OpenClaw users.
