@@ -225,15 +225,16 @@ Goal: make it easy for another OpenClaw user to install and understand.
 Goal: verify that the port is still a port.
 
 ### Deliverables
-- [ ] review every divergence against `docs/upstream-parity-map.md`
-- [ ] confirm root-level file contract stayed intact
-- [ ] confirm tool names stayed intact
-- [ ] confirm skill-first UX stayed intact
-- [ ] explicitly defer remaining Pi-only UI gaps
+- [x] review every divergence against `docs/upstream-parity-map.md`
+- [x] confirm root-level file contract stayed intact
+- [x] confirm tool names stayed intact
+- [x] confirm skill-first UX stayed intact
+- [x] explicitly defer remaining Pi-only UI gaps
+- [x] add a concise auditable parity review doc
 
 ### Review bar
-- [ ] final diff can still be described as host adaptation, not redesign
-- [ ] the repo is ready to stay private for now or open-source later
+- [x] final diff can still be described as host adaptation, not redesign
+- [x] the repo is ready to stay private for now or open-source later
 
 ---
 

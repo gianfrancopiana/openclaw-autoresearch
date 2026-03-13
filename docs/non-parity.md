@@ -48,12 +48,15 @@ Pi uses hooks such as:
 
 OpenClaw has a different hook model. We should preserve intent, not literal event names.
 
-### 5. `/autoresearch` command may be thinner or deferred
+### 5. `/autoresearch` command is thinner than Pi
 The upstream repo includes a dedicated `/autoresearch` dashboard/entry surface.
 
-OpenClaw v1 may keep the main UX skill-first and either:
-- provide a thin `/autoresearch` command, or
-- defer the command if it would distort the design
+OpenClaw v1 keeps the main UX skill-first and implements `/autoresearch` as a thin text command that:
+- detects canonical repo-root files
+- offers terse status text
+- points the agent back to `autoresearch.md`
+
+It is intentionally not a dashboard replacement.
 
 ## Non-parity that is **not** acceptable
 
