@@ -28,6 +28,7 @@ Current state: planning / source capture
 - [x] review upstream skill
 - [x] decide source-first vs redesign-first approach
 - [x] write versioned port plan into repo docs
+- [x] run fresh Codex review against cloned upstream + OpenClaw plugin examples
 
 ### Phase 1 — mechanical import
 - [ ] create OpenClaw plugin skeleton
