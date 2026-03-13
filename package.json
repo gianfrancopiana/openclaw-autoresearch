@@ -1,17 +1,29 @@
 {
-  "name": "pi-autoresearch",
+  "name": "openclaw-autoresearch",
   "version": "1.0.0",
-  "description": "Autonomous experiment loop for pi — run, measure, keep or discard. Inspired by karpathy/autoresearch.",
-  "keywords": ["pi-package"],
-  "license": "MIT",
-  "pi": {
-    "extensions": ["./extensions"],
-    "skills": ["./skills"]
+  "description": "Faithful OpenClaw port of pi-autoresearch.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "validate": "npm run typecheck && npm run test"
   },
-  "peerDependencies": {
-    "@mariozechner/pi-ai": "*",
-    "@mariozechner/pi-coding-agent": "*",
-    "@mariozechner/pi-tui": "*",
-    "@sinclair/typebox": "*"
+  "keywords": [
+    "openclaw-plugin",
+    "autoresearch"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "24.5.2",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "0.34.48"
+  },
+  "openclaw": {
+    "extensions": [
+      "./extensions/openclaw-autoresearch/index.ts"
+    ]
   }
 }
