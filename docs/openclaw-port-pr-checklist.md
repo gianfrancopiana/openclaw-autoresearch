@@ -106,16 +106,16 @@ Goal: land the first real core tool with faithful file semantics.
 Goal: faithfully execute the benchmark command and capture the result contract.
 
 ### Deliverables
-- [ ] implement `run_experiment`
-- [ ] run command from repo root / correct working directory
-- [ ] capture duration, pass/fail, exit status, output tail
-- [ ] preserve primary metric + secondary metrics output expectations
-- [ ] document expected `autoresearch.sh` behavior clearly
+- [x] implement `run_experiment`
+- [x] run command from repo root / correct working directory
+- [x] capture duration, pass/fail, exit status, output tail
+- [x] preserve primary metric + secondary metrics output expectations
+- [x] document expected `autoresearch.sh` behavior clearly
 
 ### Review bar
-- [ ] tool surface still mirrors upstream semantics
-- [ ] no provider/runtime assumption is required to run the benchmark
-- [ ] result shape is sufficient for `log_experiment`
+- [x] tool surface still mirrors upstream semantics
+- [x] no provider/runtime assumption is required to run the benchmark
+- [x] result shape is sufficient for `log_experiment`
 
 ---
 
