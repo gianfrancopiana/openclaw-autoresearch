@@ -22,7 +22,7 @@ For v1, OpenClaw should preserve that shape as closely as practical:
 
 - OpenClaw plugin = Pi extension analog
 - OpenClaw skill = close port of `autoresearch-create`
-- direct Codex CLI = execution substrate when a long-running worker is needed
+- execution stays agent/runtime-agnostic, the way other OpenClaw plugins expose capabilities without binding the architecture to one provider or CLI
 
 We should not chase Pi’s widget, fullscreen TUI, keyboard shortcuts, or exact runtime hooks in v1.
 
@@ -72,7 +72,12 @@ Preserve these behaviors closely:
 - plugin tools instead of Pi `registerTool`
 - OpenClaw skill instead of Pi skill packaging
 - lightweight status summaries instead of Pi dashboard UI
-- direct Codex CLI as worker substrate when needed
+- OpenClaw-native plugin surfaces — tools, commands, hooks, and services — instead of binding the port to any single execution backend
+
+Useful reference shapes inside OpenClaw today:
+- `diffs`: tool + prompt guidance hook
+- `memory-core`: tools + CLI
+- `phone-control`: command + service
 
 ## Recommended file layout
 
@@ -114,6 +119,15 @@ Not allowed by default:
 If OpenClaw supports a clean custom command path, add `/autoresearch` with semantics close to upstream.
 
 If that mapping is awkward, ship skill-first and add command polish later.
+
+### Execution model
+The public architecture should be agent/runtime-agnostic.
+
+That means:
+- the durable contract is files + tool semantics, not a specific worker binary
+- any OpenClaw-capable agent or harness should be able to drive the same loop
+- if unattended execution is added later, it should sit behind an internal adapter layer rather than becoming the product identity
+- provider-specific runners (Codex, ACP, others) are implementation choices, not the core architecture
 
 ## Phased implementation plan
 

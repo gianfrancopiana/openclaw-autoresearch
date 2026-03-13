@@ -17,6 +17,8 @@ Current state: planning / source capture
 - We are treating this as a **faithful port**, not a redesign.
 - Root-level session files will be preserved in v1.
 - Core tool names will be preserved in v1.
+- The architecture should stay **agent/runtime-agnostic** in the OpenClaw style; no single provider CLI should become the product identity.
+- Plugin design should follow existing OpenClaw patterns: tools, commands, hooks, and services where appropriate.
 
 ## Phase checklist
 
