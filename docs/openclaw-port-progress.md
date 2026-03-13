@@ -2,7 +2,7 @@
 
 ## Status
 
-Current state: PR 7 complete — resume/state reconstruction landed; PR 8 next
+Current state: PR 8 complete — minimal autoresearch hook landed; PR 9 next
 
 ## Current reference snapshot
 
@@ -67,6 +67,8 @@ Current state: PR 7 complete — resume/state reconstruction landed; PR 8 next
 - [x] add lightweight status/readout
 - [ ] add queued user steer behavior if cleanly supported
 - [ ] add ideas-backlog continuation behavior if cleanly supported
+- [x] add minimal before-agent autoresearch context injection
+- [x] explicitly defer queued steers and agent-end continuation when hook support would be brittle
 
 ### Phase 6 — docs and parity review
 - [x] document non-parity items
@@ -75,9 +77,9 @@ Current state: PR 7 complete — resume/state reconstruction landed; PR 8 next
 
 ## Blockers
 
-- None currently for PR 7.
+- No stable OpenClaw hook example or SDK source is present in this workspace beyond tool registration imports, so PR 8 limits itself to a conservative `before_agent_start` registration path and documents the rest as deferred.
 - GitHub remote now exists at `gianfrancopiana/openclaw-autoresearch`; collaborator access is being used via the current local auth context.
 
 ## Next recommended action
 
-- Start PR 8: add only the minimal OpenClaw hooks that cleanly support continuation semantics.
+- Start PR 9: add `/autoresearch` only if the command surface is as clean as the hook surface used in PR 8.
