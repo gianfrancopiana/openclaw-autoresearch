@@ -56,7 +56,7 @@ For a packaged local install, build the tarball and install that artifact:
 ```bash
 npm install
 npm pack
-openclaw plugins install ./gianfrancopiana-openclaw-autoresearch-1.0.0.tgz
+openclaw plugins install ./gianfrancopiana-openclaw-autoresearch-<version>.tgz
 ```
 
 The install command records the plugin, enables it, and exposes the plugin surfaces on restart. The installer reads `package.json#openclaw.extensions`, loads the root [`index.ts`](index.ts), and discovers the manifest in [`openclaw.plugin.json`](openclaw.plugin.json).

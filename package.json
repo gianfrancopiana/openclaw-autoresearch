@@ -1,6 +1,6 @@
 {
   "name": "@gianfrancopiana/openclaw-autoresearch",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Faithful OpenClaw port of pi-autoresearch.",
   "type": "module",
   "main": "./index.ts",
