@@ -1,8 +1,10 @@
-import { spawn } from "node:child_process";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 
 const OUTPUT_TAIL_LINES = 80;
 const DEFAULT_TIMEOUT_SECONDS = 600;
-const FORCE_KILL_GRACE_MS = 1_000;
+const NO_TIMEOUT_MS = 2_147_483_647;
+
+type RunCommandWithTimeout = OpenClawPluginApi["runtime"]["system"]["runCommandWithTimeout"];
 
 export type ExperimentExecutionResult = {
   readonly command: string;
@@ -17,95 +19,42 @@ export type ExperimentExecutionResult = {
 };
 
 export async function executeExperimentCommand(options: {
+  runCommandWithTimeout: RunCommandWithTimeout;
   command: string;
   cwd: string;
   timeoutSeconds?: number;
   signal?: AbortSignal;
 }): Promise<ExperimentExecutionResult> {
   const timeoutSeconds = options.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
-  const timeoutMs = Math.max(0, timeoutSeconds) * 1_000;
+  const timeoutMs =
+    timeoutSeconds > 0 ? Math.max(1, Math.floor(timeoutSeconds * 1_000)) : NO_TIMEOUT_MS;
   const startedAt = Date.now();
 
-  return await new Promise<ExperimentExecutionResult>((resolve) => {
-    const child = spawn("bash", ["-c", options.command], {
-      cwd: options.cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+  if (options.signal?.aborted) {
+    const error = new Error("Experiment run aborted before start.");
+    error.name = "AbortError";
+    throw error;
+  }
 
-    let stdout = "";
-    let stderr = "";
-    let timedOut = false;
-    let forceKillTimer: NodeJS.Timeout | undefined;
-
-    const timeoutTimer =
-      timeoutMs > 0
-        ? setTimeout(() => {
-            timedOut = true;
-            child.kill("SIGTERM");
-            forceKillTimer = setTimeout(() => {
-              if (!child.killed) {
-                child.kill("SIGKILL");
-              }
-            }, FORCE_KILL_GRACE_MS);
-          }, timeoutMs)
-        : undefined;
-
-    const abortHandler = () => {
-      child.kill("SIGTERM");
-      forceKillTimer = setTimeout(() => {
-        if (!child.killed) {
-          child.kill("SIGKILL");
-        }
-      }, FORCE_KILL_GRACE_MS);
-    };
-
-    if (options.signal) {
-      if (options.signal.aborted) {
-        abortHandler();
-      } else {
-        options.signal.addEventListener("abort", abortHandler, { once: true });
-      }
-    }
-
-    child.stdout.on("data", (chunk: string | Buffer) => {
-      stdout += chunk.toString();
-    });
-
-    child.stderr.on("data", (chunk: string | Buffer) => {
-      stderr += chunk.toString();
-    });
-
-    child.on("error", (error) => {
-      stderr += `${stderr ? "\n" : ""}${String(error.message || error)}`;
-    });
-
-    child.on("close", (code) => {
-      if (timeoutTimer) {
-        clearTimeout(timeoutTimer);
-      }
-      if (forceKillTimer) {
-        clearTimeout(forceKillTimer);
-      }
-      if (options.signal) {
-        options.signal.removeEventListener("abort", abortHandler);
-      }
-
-      const durationSeconds = (Date.now() - startedAt) / 1_000;
-      const passed = code === 0 && !timedOut;
-
-      resolve({
-        command: options.command,
-        exitCode: code,
-        durationSeconds,
-        passed,
-        crashed: !passed,
-        timedOut,
-        tailOutput: createOutputTail(stdout, stderr),
-        stdout,
-        stderr,
-      });
-    });
+  const result = await options.runCommandWithTimeout(["bash", "-c", options.command], {
+    cwd: options.cwd,
+    timeoutMs,
   });
+  const durationSeconds = (Date.now() - startedAt) / 1_000;
+  const timedOut = result.termination === "timeout";
+  const passed = result.code === 0 && result.termination === "exit";
+
+  return {
+    command: options.command,
+    exitCode: result.code,
+    durationSeconds,
+    passed,
+    crashed: !passed,
+    timedOut,
+    tailOutput: createOutputTail(result.stdout, result.stderr),
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
 }
 
 function createOutputTail(stdout: string, stderr: string): string {

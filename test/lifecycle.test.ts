@@ -11,6 +11,7 @@ import {
   getAutoresearchRuntimeState,
   queueAutoresearchSteer,
 } from "../extensions/openclaw-autoresearch/src/runtime-state.js";
+import { runCommandWithTimeout } from "./helpers/fake-runtime.js";
 
 function createTempDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -23,6 +24,11 @@ function createAbortSignal(): AbortSignal {
 function createApi(cwd: string) {
   return {
     resolvePath: vi.fn(() => cwd),
+    runtime: {
+      system: {
+        runCommandWithTimeout,
+      },
+    },
   };
 }
 
@@ -410,7 +416,7 @@ describe("experiment lifecycle tools", () => {
   it("routes keep to commit and leaves discard/crash as manual reverts while preserving logged statuses", async () => {
     const cwd = createTempDir("autoresearch-log-status-");
     await seedExperiment(cwd);
-    const commitSpy = vi.spyOn(gitModule, "commitKeptExperiment").mockReturnValue({
+    const commitSpy = vi.spyOn(gitModule, "commitKeptExperiment").mockResolvedValue({
       attempted: true,
       committed: true,
       commit: "def5678",

@@ -11,6 +11,32 @@ export type ToolRegistration = {
 
 export type OpenClawPluginApi = {
   resolvePath(path: string): string;
+  runtime: {
+    system: {
+      runCommandWithTimeout: (
+        argv: string[],
+        optionsOrTimeout:
+          | number
+          | {
+              timeoutMs: number;
+              cwd?: string;
+              input?: string;
+              env?: NodeJS.ProcessEnv;
+              windowsVerbatimArguments?: boolean;
+              noOutputTimeoutMs?: number;
+            },
+      ) => Promise<{
+        pid?: number;
+        stdout: string;
+        stderr: string;
+        code: number | null;
+        signal: NodeJS.Signals | null;
+        killed: boolean;
+        termination: "exit" | "timeout" | "no-output-timeout" | "signal";
+        noOutputTimedOut?: boolean;
+      }>;
+    };
+  };
   registerTool(tool: ToolRegistration): void;
   registerCommand(command: CommandRegistration): void;
   on?(hookName: string, handler: (event: unknown, ctx: { cwd?: string }) => unknown): void;

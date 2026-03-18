@@ -78,7 +78,8 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
       };
 
       if (params.status === "keep") {
-        const gitResult = commitKeptExperiment({
+        const gitResult = await commitKeptExperiment({
+          runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
           cwd: cwd,
           description: params.description,
           metricName: state.metricName,

@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import plugin from "../index.js";
+import { runCommandWithTimeout } from "./helpers/fake-runtime.js";
 
 describe("plugin registration", () => {
   it("registers the command, OpenClaw hooks, and all tool surfaces", () => {
     const api = {
       resolvePath: vi.fn(() => "/tmp/repo"),
+      runtime: {
+        system: {
+          runCommandWithTimeout,
+        },
+      },
       registerTool: vi.fn(),
       registerCommand: vi.fn(),
       on: vi.fn(),

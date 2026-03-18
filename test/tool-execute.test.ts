@@ -7,6 +7,7 @@ import { createAutoresearchStatusTool } from "../extensions/openclaw-autoresearc
 import { createRunExperimentTool } from "../extensions/openclaw-autoresearch/src/tools/run-experiment.js";
 import { createLogExperimentTool } from "../extensions/openclaw-autoresearch/src/tools/log-experiment.js";
 import { AUTORESEARCH_ROOT_FILES } from "../extensions/openclaw-autoresearch/src/files.js";
+import { runCommandWithTimeout } from "./helpers/fake-runtime.js";
 
 function createTempDir(): string {
   return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "autoresearch-tool-test-")));
@@ -15,6 +16,11 @@ function createTempDir(): string {
 function createApi(cwd: string) {
   return {
     resolvePath: vi.fn(() => cwd),
+    runtime: {
+      system: {
+        runCommandWithTimeout,
+      },
+    },
   };
 }
 

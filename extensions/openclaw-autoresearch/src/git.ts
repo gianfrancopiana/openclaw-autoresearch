@@ -1,4 +1,8 @@
-import { spawnSync } from "node:child_process";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+
+const GIT_TIMEOUT_MS = 30_000;
+
+type RunCommandWithTimeout = OpenClawPluginApi["runtime"]["system"]["runCommandWithTimeout"];
 
 export type GitCommandResult = {
   readonly code: number | null;
@@ -15,24 +19,29 @@ export type GitKeepResult = {
   readonly command: GitCommandResult;
 };
 
-function runGitCommand(cwd: string, args: readonly string[]): GitCommandResult {
-  const result = spawnSync("git", [...args], {
+async function runGitCommand(
+  runCommandWithTimeout: RunCommandWithTimeout,
+  cwd: string,
+  args: readonly string[],
+): Promise<GitCommandResult> {
+  const result = await runCommandWithTimeout(["git", ...args], {
     cwd,
-    encoding: "utf8",
+    timeoutMs: GIT_TIMEOUT_MS,
   });
-
   const stdout = result.stdout ?? "";
   const stderr = result.stderr ?? "";
+  const combinedOutput = `${stdout}${stderr}`.trim() || describeTermination(result.termination);
 
   return {
-    code: result.status,
+    code: result.code,
     stdout,
     stderr,
-    combinedOutput: `${stdout}${stderr}`.trim(),
+    combinedOutput,
   };
 }
 
-export function commitKeptExperiment(options: {
+export async function commitKeptExperiment(options: {
+  runCommandWithTimeout: RunCommandWithTimeout;
   cwd: string;
   description: string;
   metricName: string;
@@ -40,7 +49,7 @@ export function commitKeptExperiment(options: {
   metrics: Record<string, number>;
   commit: string;
   status: "keep";
-}): GitKeepResult {
+}): Promise<GitKeepResult> {
   const resultData: Record<string, unknown> = {
     status: options.status,
     [options.metricName || "metric"]: options.metric,
@@ -48,7 +57,10 @@ export function commitKeptExperiment(options: {
   };
   const commitMessage = `${options.description}\n\nResult: ${JSON.stringify(resultData)}`;
 
-  const repoRootResult = runGitCommand(options.cwd, ["rev-parse", "--show-toplevel"]);
+  const repoRootResult = await runGitCommand(options.runCommandWithTimeout, options.cwd, [
+    "rev-parse",
+    "--show-toplevel",
+  ]);
   if (repoRootResult.code !== 0 || repoRootResult.stdout.trim().length === 0) {
     return {
       attempted: true,
@@ -61,7 +73,7 @@ export function commitKeptExperiment(options: {
 
   const repoRoot = repoRootResult.stdout.trim();
 
-  const addResult = runGitCommand(repoRoot, ["add", "-A"]);
+  const addResult = await runGitCommand(options.runCommandWithTimeout, repoRoot, ["add", "-A"]);
   if (addResult.code !== 0) {
     return {
       attempted: true,
@@ -72,7 +84,11 @@ export function commitKeptExperiment(options: {
     };
   }
 
-  const diffResult = runGitCommand(repoRoot, ["diff", "--cached", "--quiet"]);
+  const diffResult = await runGitCommand(options.runCommandWithTimeout, repoRoot, [
+    "diff",
+    "--cached",
+    "--quiet",
+  ]);
   if (diffResult.code === 0) {
     return {
       attempted: true,
@@ -92,7 +108,11 @@ export function commitKeptExperiment(options: {
     };
   }
 
-  const commitResult = runGitCommand(repoRoot, ["commit", "-m", commitMessage]);
+  const commitResult = await runGitCommand(options.runCommandWithTimeout, repoRoot, [
+    "commit",
+    "-m",
+    commitMessage,
+  ]);
   if (commitResult.code !== 0) {
     return {
       attempted: true,
@@ -103,7 +123,11 @@ export function commitKeptExperiment(options: {
     };
   }
 
-  const revParseResult = runGitCommand(repoRoot, ["rev-parse", "--short=7", "HEAD"]);
+  const revParseResult = await runGitCommand(options.runCommandWithTimeout, repoRoot, [
+    "rev-parse",
+    "--short=7",
+    "HEAD",
+  ]);
   const actualCommit =
     revParseResult.code === 0 && revParseResult.stdout.trim().length >= 7
       ? revParseResult.stdout.trim().slice(0, 7)
@@ -129,4 +153,17 @@ function truncateOutput(output: string): string {
 
 function formatExit(code: number | null): string {
   return code === null ? "" : ` (exit ${code})`;
+}
+
+function describeTermination(termination: "exit" | "timeout" | "no-output-timeout" | "signal"): string {
+  switch (termination) {
+    case "timeout":
+      return "command timed out";
+    case "no-output-timeout":
+      return "command timed out waiting for output";
+    case "signal":
+      return "command terminated by signal";
+    default:
+      return "";
+  }
 }

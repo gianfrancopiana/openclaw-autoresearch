@@ -34,6 +34,7 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
       let details;
       try {
         details = await executeExperimentCommand({
+          runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
           command: params.command,
           cwd,
           timeoutSeconds: params.timeout_seconds,
