@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 
 export function resolveToolCwd(api: OpenClawPluginApi, requestedCwd?: unknown): string {
   const normalizedRequestedCwd =

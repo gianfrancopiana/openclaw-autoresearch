@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { InitExperimentParams } from "./schemas.js";
 import { createConfigHeader, writeConfigHeader } from "../logging.js";
 import {

@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { Type } from "@sinclair/typebox";
 import { reconstructStateFromJsonl, type AutoresearchStateSnapshot } from "../state.js";
 import { getAutoresearchRuntimeState, type AutoresearchRuntimeSnapshot } from "../runtime-state.js";

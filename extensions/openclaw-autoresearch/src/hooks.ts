@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { AUTORESEARCH_ROOT_FILES } from "./files.js";
 import { reconstructStateFromJsonl } from "./state.js";
 import {

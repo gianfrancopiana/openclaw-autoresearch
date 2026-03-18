@@ -9,10 +9,11 @@
     "types": ["node", "vitest/globals"],
     "baseUrl": ".",
     "paths": {
-      "openclaw/plugin-sdk/core": ["./test/shims/openclaw-plugin-sdk-core.ts"]
+      "openclaw/plugin-sdk": ["./test/shims/openclaw-plugin-sdk-core.ts"]
     }
   },
   "include": [
+    "index.ts",
     "extensions/openclaw-autoresearch/**/*.ts",
     "test/**/*.ts"
   ]

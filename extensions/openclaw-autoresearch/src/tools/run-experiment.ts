@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { RunExperimentParams } from "./schemas.js";
 import { executeExperimentCommand } from "../execute.js";
 import { setAutoresearchRunInFlight } from "../runtime-state.js";

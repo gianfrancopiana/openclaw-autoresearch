@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import {
   AUTORESEARCH_PLUGIN_DESCRIPTION,
   AUTORESEARCH_PLUGIN_ID,

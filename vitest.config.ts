@@ -9,7 +9,7 @@ const shimPath = fileURLToPath(
 export default defineConfig({
   resolve: {
     alias: {
-      "openclaw/plugin-sdk/core": shimPath,
+      "openclaw/plugin-sdk": shimPath,
     },
   },
   test: {

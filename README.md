@@ -31,25 +31,35 @@ The design is file-first: any agent can pick up the repo-root files and continue
 
 ## Install
 
+Use OpenClaw's plugin installer:
+
+```bash
+openclaw plugins install @gianfrancopiana/openclaw-autoresearch
+```
+
+If you're running from a local OpenClaw checkout, use:
+
+```bash
+pnpm openclaw plugins install @gianfrancopiana/openclaw-autoresearch
+```
+
+For local plugin development, link your working copy instead of copying files:
+
+```bash
+openclaw plugins install --link /absolute/path/to/openclaw-autoresearch
+# or from a local OpenClaw checkout:
+# pnpm openclaw plugins install --link /absolute/path/to/openclaw-autoresearch
+```
+
+For a packaged local install, build the tarball and install that artifact:
+
 ```bash
 npm install
+npm pack
+openclaw plugins install ./gianfrancopiana-openclaw-autoresearch-1.0.0.tgz
 ```
 
-Then load this repo path in OpenClaw plugin discovery and restart the gateway:
-
-```yaml
-plugins:
-  load:
-    paths:
-      - /absolute/path/to/openclaw-autoresearch
-  entries:
-    openclaw-autoresearch:
-      enabled: true
-```
-
-OpenClaw discovers `openclaw.plugin.json`, loads `extensions/openclaw-autoresearch/index.ts`, and exposes `autoresearch-create`.
-
-Manual install is also possible: copy the plugin root, `extensions/openclaw-autoresearch/`, and `skills/autoresearch-create/` into your managed OpenClaw locations, then restart.
+The install command records the plugin, enables it, and exposes the plugin surfaces on restart. The installer reads `package.json#openclaw.extensions`, loads the root [`index.ts`](index.ts), and discovers the manifest in [`openclaw.plugin.json`](openclaw.plugin.json).
 
 Verify:
 
@@ -95,7 +105,10 @@ npm install --include=dev
 npm run typecheck
 npm test
 npm run validate
+npm run release:verify
 ```
+
+Release instructions, including npm 2FA publishing, live in [`RELEASING.md`](RELEASING.md).
 
 The local test shim supports typechecking and tests without a full OpenClaw host checkout. Runtime behavior depends on a real OpenClaw host.
 

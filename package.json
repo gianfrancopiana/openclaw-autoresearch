@@ -1,18 +1,40 @@
 {
-  "name": "openclaw-autoresearch",
+  "name": "@gianfrancopiana/openclaw-autoresearch",
   "version": "1.0.0",
   "description": "Faithful OpenClaw port of pi-autoresearch.",
   "type": "module",
+  "main": "./index.ts",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "validate": "npm run typecheck && npm run test"
+    "validate": "npm run typecheck && npm run test",
+    "release:verify": "npm run validate && npm pack --dry-run"
   },
   "keywords": [
+    "openclaw",
     "openclaw-plugin",
     "autoresearch"
   ],
+  "files": [
+    "index.ts",
+    "extensions/openclaw-autoresearch/**/*.ts",
+    "openclaw.plugin.json",
+    "skills/",
+    "docs/",
+    "README.md",
+    "RELEASING.md",
+    "LICENSE"
+  ],
   "license": "MIT",
+  "author": "Gianfranco Piana",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gianfrancopiana/openclaw-autoresearch.git"
+  },
+  "homepage": "https://github.com/gianfrancopiana/openclaw-autoresearch#readme",
+  "bugs": {
+    "url": "https://github.com/gianfrancopiana/openclaw-autoresearch/issues"
+  },
   "devDependencies": {
     "@types/node": "24.5.2",
     "typescript": "5.9.2",
@@ -21,9 +43,15 @@
   "dependencies": {
     "@sinclair/typebox": "0.34.48"
   },
+  "peerDependencies": {
+    "openclaw": "*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "openclaw": {
     "extensions": [
-      "./extensions/openclaw-autoresearch/index.ts"
+      "./index.ts"
     ]
   }
 }

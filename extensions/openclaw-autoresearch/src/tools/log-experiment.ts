@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { LogExperimentParams } from "./schemas.js";
 import { commitKeptExperiment } from "../git.js";
 import { appendResultEntry, type AutoresearchResultEntry } from "../logging.js";

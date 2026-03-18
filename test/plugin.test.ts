@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import plugin from "../extensions/openclaw-autoresearch/index.js";
+import plugin from "../index.js";
 
 describe("plugin registration", () => {
   it("registers the command, OpenClaw hooks, and all tool surfaces", () => {
