@@ -19,10 +19,11 @@ describe("plugin registration", () => {
     plugin.register(api);
 
     expect(api.registerCommand).toHaveBeenCalledTimes(1);
-    expect(api.on).toHaveBeenCalledTimes(4);
+    expect(api.on).toHaveBeenCalledTimes(5);
     expect(api.on.mock.calls.map(([hookName]) => hookName)).toEqual([
       "before_prompt_build",
       "message_received",
+      "before_tool_call",
       "agent_end",
       "session_end",
     ]);

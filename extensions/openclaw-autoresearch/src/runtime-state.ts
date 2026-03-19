@@ -7,12 +7,26 @@ export type PendingAutoresearchCommand =
     }
   | null;
 
+export type PendingExperimentRun = {
+  readonly command: string;
+  readonly commit: string | null;
+  readonly primaryMetric: number | null;
+  readonly metrics: Record<string, number>;
+  readonly durationSeconds: number;
+  readonly exitCode: number | null;
+  readonly passed: boolean;
+  readonly timedOut: boolean;
+  readonly tailOutput: string;
+  readonly capturedAt: number;
+};
+
 export type AutoresearchRuntimeSnapshot = {
   readonly mode: AutoresearchRuntimeMode;
   readonly runInFlight: boolean;
   readonly queuedSteers: readonly string[];
   readonly needsContinuationReminder: boolean;
   readonly pendingCommand: PendingAutoresearchCommand;
+  readonly pendingRun: PendingExperimentRun | null;
 };
 
 type MutableAutoresearchRuntimeState = {
@@ -21,6 +35,7 @@ type MutableAutoresearchRuntimeState = {
   queuedSteers: string[];
   needsContinuationReminder: boolean;
   pendingCommand: PendingAutoresearchCommand;
+  pendingRun: PendingExperimentRun | null;
 };
 
 const MAX_QUEUED_STEERS = 20;
@@ -33,6 +48,7 @@ function createDefaultRuntimeState(): MutableAutoresearchRuntimeState {
     queuedSteers: [],
     needsContinuationReminder: false,
     pendingCommand: null,
+    pendingRun: null,
   };
 }
 
@@ -53,6 +69,7 @@ export function getAutoresearchRuntimeState(cwd: string): AutoresearchRuntimeSna
     queuedSteers: [...state.queuedSteers],
     needsContinuationReminder: state.needsContinuationReminder,
     pendingCommand: state.pendingCommand,
+    pendingRun: state.pendingRun,
   };
 }
 
@@ -136,6 +153,26 @@ export function consumeAutoresearchContinuationReminder(cwd: string): boolean {
   const needsReminder = state.needsContinuationReminder;
   state.needsContinuationReminder = false;
   return needsReminder;
+}
+
+export function setAutoresearchPendingRun(
+  cwd: string,
+  pendingRun: PendingExperimentRun | null,
+): AutoresearchRuntimeSnapshot {
+  const state = getMutableRuntimeState(cwd);
+  state.pendingRun = pendingRun;
+  return getAutoresearchRuntimeState(cwd);
+}
+
+export function getAutoresearchPendingRun(cwd: string): PendingExperimentRun | null {
+  return getMutableRuntimeState(cwd).pendingRun;
+}
+
+export function consumeAutoresearchPendingRun(cwd: string): PendingExperimentRun | null {
+  const state = getMutableRuntimeState(cwd);
+  const pendingRun = state.pendingRun;
+  state.pendingRun = null;
+  return pendingRun;
 }
 
 export function clearAutoresearchRuntimeState(cwd: string): void {

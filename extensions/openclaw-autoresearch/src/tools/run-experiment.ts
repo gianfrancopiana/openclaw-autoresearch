@@ -1,8 +1,17 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { RunExperimentParams } from "./schemas.js";
 import { executeExperimentCommand } from "../execute.js";
-import { setAutoresearchRunInFlight } from "../runtime-state.js";
+import {
+  getAutoresearchPendingRun,
+  setAutoresearchPendingRun,
+  setAutoresearchRunInFlight,
+} from "../runtime-state.js";
 import { resolveToolCwd } from "./tool-cwd.js";
+import { parseMetricLines } from "../metrics.js";
+import { readShortHeadCommit } from "../git.js";
+import { readAutoresearchCheckpoint, writeAutoresearchCheckpoint } from "../checkpoint.js";
+import { readRecentLoggedRuns, reconstructStateFromJsonl } from "../state.js";
+import { syncAutoresearchSessionDoc } from "../session-doc.js";
 
 export function createRunExperimentTool(api: OpenClawPluginApi) {
   return {
@@ -22,6 +31,28 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
       onUpdate: ((update: unknown) => void | Promise<void>) | undefined,
     ) {
       const cwd = resolveToolCwd(api, params.cwd);
+      const checkpoint = readAutoresearchCheckpoint(cwd);
+      const existingPendingRun = getAutoresearchPendingRun(cwd) ?? checkpoint?.pendingRun ?? null;
+
+      if (existingPendingRun) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                "The previous run_experiment result has not been logged yet.\n" +
+                `Pending command: ${existingPendingRun.command}\n` +
+                "Call log_experiment next. You can omit commit/metric and the tool will use the pending run by default.",
+            },
+          ],
+          details: {
+            status: "error",
+            phase: "pending_log",
+            pendingRun: existingPendingRun,
+          },
+        };
+      }
+
       setAutoresearchRunInFlight(cwd, true);
 
       if (onUpdate) {
@@ -45,6 +76,48 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
         throw error;
       }
 
+      const state = reconstructStateFromJsonl(cwd);
+      const parsedMetrics = parseMetricLines([details.stdout, details.stderr].join("\n"));
+      const detectedPrimaryMetricName =
+        parsedMetrics[state.metricName] !== undefined
+          ? state.metricName
+          : Object.keys(parsedMetrics).length === 1
+            ? Object.keys(parsedMetrics)[0] ?? null
+            : null;
+      const primaryMetric =
+        detectedPrimaryMetricName !== null ? parsedMetrics[detectedPrimaryMetricName] ?? null : null;
+      const secondaryMetrics =
+        detectedPrimaryMetricName !== null
+          ? Object.fromEntries(
+              Object.entries(parsedMetrics).filter(([name]) => name !== detectedPrimaryMetricName),
+            )
+          : parsedMetrics;
+      const currentCommit = await readShortHeadCommit({
+        runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
+        cwd,
+      });
+      const pendingRun = {
+        command: params.command,
+        commit: currentCommit,
+        primaryMetric,
+        metrics: secondaryMetrics,
+        durationSeconds: details.durationSeconds,
+        exitCode: details.exitCode,
+        passed: details.passed,
+        timedOut: details.timedOut,
+        tailOutput: details.tailOutput,
+        capturedAt: Date.now(),
+      } as const;
+      setAutoresearchPendingRun(cwd, pendingRun);
+      const nextCheckpoint = writeAutoresearchCheckpoint({
+        cwd,
+        state,
+        sessionStartCommit: checkpoint?.sessionStartCommit ?? currentCommit,
+        recentLoggedRuns: readRecentLoggedRuns(cwd, 8),
+        pendingRun,
+      });
+      syncAutoresearchSessionDoc(cwd, nextCheckpoint);
+
       let text = "";
       if (details.timedOut) {
         text += `TIMEOUT after ${details.durationSeconds.toFixed(1)}s\n`;
@@ -55,10 +128,25 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
       }
 
       text += `\nLast 80 lines of output:\n${details.tailOutput || "(no output)"}`;
+      if (Object.keys(parsedMetrics).length > 0) {
+        text += `\n\nParsed METRIC lines: ${Object.entries(parsedMetrics)
+          .map(([name, value]) => `${name}=${value}`)
+          .join(", ")}`;
+      } else {
+        text += `\n\nNo METRIC lines were detected.`;
+      }
+      text +=
+        "\nNext step: call log_experiment before another run. When the primary METRIC was captured, log_experiment can infer commit and metric from this run.";
 
       return {
         content: [{ type: "text" as const, text }],
-        details,
+        details: {
+          ...details,
+          metrics: parsedMetrics,
+          secondaryMetrics,
+          primaryMetric,
+          pendingRun,
+        },
       };
     },
   };

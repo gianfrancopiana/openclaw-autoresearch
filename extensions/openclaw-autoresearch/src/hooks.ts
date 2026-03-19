@@ -64,6 +64,30 @@ export function registerAutoresearchHooks(api: OpenClawPluginApi): void {
       queueAutoresearchSteer(cwd, messageText);
     });
 
+    hookApi.on("before_tool_call", (event, ctx) => {
+      const cwd = resolveHookCwd(api, ctx);
+      if (cwd === null || !shouldEnforceAutoresearchMode(cwd)) {
+        return;
+      }
+
+      const record = event as Record<string, unknown>;
+      const toolName = typeof record.toolName === "string" ? record.toolName : "";
+      if (toolName !== "exec" && toolName !== "bash") {
+        return;
+      }
+
+      const command = extractToolCommand(record.params);
+      if (!command || !looksLikeExperimentCommand(command)) {
+        return;
+      }
+
+      return {
+        block: true,
+        blockReason:
+          "Autoresearch mode blocks raw benchmark execution through exec/bash. Use run_experiment so the result is captured and log_experiment can enforce the experiment lifecycle.",
+      };
+    });
+
     hookApi.on("agent_end", (_event, ctx) => {
       const cwd = resolveHookCwd(api, ctx);
       if (cwd === null) {
@@ -112,11 +136,7 @@ export function registerAutoresearchHooks(api: OpenClawPluginApi): void {
 export function buildBeforePromptBuildContext(cwd: string): string | null {
   const state = reconstructStateFromJsonl(cwd);
   const runtimeState = getAutoresearchRuntimeState(cwd);
-  const modeEnabled =
-    runtimeState.mode === "on" ||
-    (runtimeState.mode !== "off" && (state.mode === "active" || state.hasSessionDoc));
-
-  if (!modeEnabled) {
+  if (!shouldEnforceAutoresearchMode(cwd, state, runtimeState)) {
     return null;
   }
 
@@ -144,6 +164,8 @@ export function buildBeforePromptBuildContext(cwd: string): string | null {
       `Read ${AUTORESEARCH_ROOT_FILES.sessionDoc} before resuming or changing the experiment loop, and re-read it after compaction.`,
       "Resume the autonomous upstream loop: edit, run_experiment, log_experiment, keep/discard/crash, repeat.",
       "Use init_experiment, run_experiment, and log_experiment for experiment state changes. Never stop unless the user explicitly interrupts the loop.",
+      "Never run benchmark or test commands through raw exec/bash during autoresearch mode. Use run_experiment so the plugin can capture metrics, enforce logging, and preserve resumable state.",
+      "After every run_experiment, call log_experiment before starting another run. If METRIC lines were captured, log_experiment can infer commit and metric from the pending run.",
     );
     if (pendingCommand?.args) {
       lines.push(`Additional resume instruction from /autoresearch: ${pendingCommand.args}`);
@@ -231,4 +253,50 @@ function firstString(...values: unknown[]): string | null {
 
 function isCommandLikeMessage(text: string): boolean {
   return /^[\/!]/.test(text.trim());
+}
+
+function shouldEnforceAutoresearchMode(
+  cwd: string,
+  state = reconstructStateFromJsonl(cwd),
+  runtimeState = getAutoresearchRuntimeState(cwd),
+): boolean {
+  return (
+    runtimeState.mode === "on" ||
+    runtimeState.runInFlight ||
+    runtimeState.pendingRun !== null ||
+    (runtimeState.mode !== "off" && (state.mode === "active" || state.hasSessionDoc))
+  );
+}
+
+function extractToolCommand(params: unknown): string | null {
+  if (!params || typeof params !== "object") {
+    return null;
+  }
+
+  const record = params as Record<string, unknown>;
+  for (const key of ["command", "cmd", "args"]) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function looksLikeExperimentCommand(command: string): boolean {
+  const normalized = command.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  const readOnlyPatterns = [
+    /^(pwd|ls|find|rg|grep|sed|cat|head|tail|wc|stat)\b/,
+    /^git\s+(status|diff|show|log|rev-parse|branch|remote)\b/,
+  ];
+  if (readOnlyPatterns.some((pattern) => pattern.test(normalized))) {
+    return false;
+  }
+
+  return true;
 }

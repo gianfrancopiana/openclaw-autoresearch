@@ -78,8 +78,8 @@ async function runExperiment(
 async function logExperiment(
   cwd: string,
   params: {
-    commit: string;
-    metric: number;
+    commit?: string;
+    metric?: number;
     status: "keep" | "discard" | "crash";
     description: string;
     metrics?: Record<string, number>;
@@ -232,6 +232,7 @@ describe("experiment lifecycle tools", () => {
       passed: true,
       crashed: false,
       timedOut: false,
+      primaryMetric: null,
       stdout: "hello\nworld\n",
       stderr: "",
       tailOutput: "hello\nworld",
@@ -264,9 +265,9 @@ describe("experiment lifecycle tools", () => {
   });
 
   it("marks timed out runs and keeps the output-tail shape to the last 80 lines", async () => {
-    const cwd = createTempDir("autoresearch-run-timeout-");
+    const timeoutCwd = createTempDir("autoresearch-run-timeout-");
 
-    const timeoutResult = await runExperiment(cwd, {
+    const timeoutResult = await runExperiment(timeoutCwd, {
       command: "echo start; sleep 0.2; echo done",
       timeout_seconds: 0.05,
     });
@@ -278,19 +279,27 @@ describe("experiment lifecycle tools", () => {
       timedOut: true,
     });
     expect((timeoutResult.content[0] as { text: string }).text).toContain("TIMEOUT");
-    expect(timeoutResult.details.stdout).toContain("start\n");
-    expect(timeoutResult.details.stdout).not.toContain("done\n");
+    const timeoutDetails = timeoutResult.details as {
+      stdout: string;
+      timedOut: boolean;
+      exitCode: number | null;
+      passed: boolean;
+      crashed: boolean;
+    };
+    expect(timeoutDetails.stdout).toContain("start\n");
+    expect(timeoutDetails.stdout).not.toContain("done\n");
 
-    const tailResult = await runExperiment(cwd, {
+    const tailCwd = createTempDir("autoresearch-run-tail-");
+    const tailResult = await runExperiment(tailCwd, {
       command:
         "i=1; while [ $i -le 100 ]; do echo line-$i; i=$((i+1)); done",
     });
 
-    const tailLines = tailResult.details.tailOutput.split("\n");
+    const tailLines = (tailResult.details as { tailOutput: string }).tailOutput.split("\n");
     expect(tailLines).toHaveLength(80);
     expect(tailLines[0]).toBe("line-21");
     expect(tailLines[79]).toBe("line-100");
-    expect(tailResult.details.tailOutput).not.toContain("line-20");
+    expect((tailResult.details as { tailOutput: string }).tailOutput).not.toContain("line-20");
   });
 
   it("appends a result row to autoresearch.jsonl and preserves secondary metrics in state", async () => {
@@ -529,6 +538,72 @@ describe("experiment lifecycle tools", () => {
     expect(getAutoresearchRuntimeState(cwd)).toMatchObject({
       runInFlight: false,
       queuedSteers: [],
+      pendingRun: null,
     });
+  });
+
+  it("blocks a second run_experiment until the previous result is logged", async () => {
+    const cwd = createTempDir("autoresearch-pending-run-");
+    await seedExperiment(cwd);
+
+    const first = await runExperiment(cwd, {
+      command: "printf 'METRIC total_ms=120\\n'",
+    });
+
+    expect(first.details).toMatchObject({
+      primaryMetric: 120,
+      pendingRun: {
+        command: "printf 'METRIC total_ms=120\\n'",
+      },
+    });
+
+    const second = await runExperiment(cwd, {
+      command: "printf 'METRIC total_ms=110\\n'",
+    });
+
+    expect(second.details).toMatchObject({
+      status: "error",
+      phase: "pending_log",
+    });
+    expect((second.content[0] as { text: string }).text).toContain(
+      "previous run_experiment result has not been logged yet",
+    );
+  });
+
+  it("lets log_experiment default commit and metric from the pending run", async () => {
+    const cwd = createTempDir("autoresearch-log-defaults-");
+    await seedExperiment(cwd);
+
+    await runExperiment(cwd, {
+      command: "printf 'METRIC total_ms=120\\nMETRIC compile_ms=15\\n'",
+    });
+
+    const result = await logExperiment(cwd, {
+      status: "discard",
+      description: "baseline",
+    });
+
+    expect(result.details).toMatchObject({
+      status: "ok",
+      experiment: {
+        metric: 120,
+        metrics: {
+          compile_ms: 15,
+        },
+      },
+    });
+    expect((result.content[0] as { text: string }).text).toContain(
+      "Used the pending run_experiment result as the source of truth",
+    );
+    expect(getAutoresearchRuntimeState(cwd)).toMatchObject({
+      pendingRun: null,
+      runInFlight: false,
+    });
+    expect(
+      fs.readFileSync(path.join(cwd, "autoresearch.checkpoint.json"), "utf8"),
+    ).toContain('"pendingRun": null');
+    expect(fs.readFileSync(path.join(cwd, "autoresearch.md"), "utf8")).toContain(
+      "## Plugin Checkpoint",
+    );
   });
 });

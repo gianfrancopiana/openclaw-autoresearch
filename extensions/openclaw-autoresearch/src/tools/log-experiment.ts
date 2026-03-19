@@ -1,19 +1,24 @@
 import * as fs from "node:fs";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { LogExperimentParams } from "./schemas.js";
-import { commitKeptExperiment } from "../git.js";
+import { commitKeptExperiment, readShortHeadCommit } from "../git.js";
 import { appendResultEntry, type AutoresearchResultEntry } from "../logging.js";
 import { getAutoresearchRootFilePath } from "../files.js";
 import {
+  readRecentLoggedRuns,
   reconstructStateFromJsonl,
   type AutoresearchStateSnapshot,
   type SecondaryMetricDef,
 } from "../state.js";
 import {
+  consumeAutoresearchPendingRun,
+  getAutoresearchPendingRun,
   consumeAutoresearchSteers,
   setAutoresearchRunInFlight,
 } from "../runtime-state.js";
 import { resolveToolCwd } from "./tool-cwd.js";
+import { readAutoresearchCheckpoint, writeAutoresearchCheckpoint } from "../checkpoint.js";
+import { syncAutoresearchSessionDoc } from "../session-doc.js";
 
 export function createLogExperimentTool(api: OpenClawPluginApi) {
   return {
@@ -26,8 +31,8 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
       _toolCallId: string,
       params: {
         cwd?: string;
-        commit: string;
-        metric: number;
+        commit?: string;
+        metric?: number;
         status: "keep" | "discard" | "crash";
         description: string;
         metrics?: Record<string, number>;
@@ -37,8 +42,37 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
       _onUpdate: unknown,
     ) {
       const cwd = resolveToolCwd(api, params.cwd);
+      const checkpoint = readAutoresearchCheckpoint(cwd);
+      const pendingRun = getAutoresearchPendingRun(cwd) ?? checkpoint?.pendingRun ?? null;
       const state = reconstructStateFromJsonl(cwd);
-      const secondaryMetrics = params.metrics ?? {};
+      const secondaryMetrics = params.metrics ?? pendingRun?.metrics ?? {};
+      const inferredCommit =
+        params.commit ??
+        pendingRun?.commit ??
+        (await readShortHeadCommit({
+          runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
+          cwd,
+        })) ??
+        "";
+      const inferredMetric = params.metric ?? pendingRun?.primaryMetric;
+
+      if (inferredMetric === null || inferredMetric === undefined) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                "No primary metric is available to log.\n" +
+                `Expected a METRIC line for ${state.metricName} from run_experiment, or provide metric explicitly.`,
+            },
+          ],
+          details: {
+            status: "error",
+            phase: "metric",
+            pendingRun,
+          },
+        };
+      }
 
       if (state.secondaryMetrics.length > 0) {
         const validationError = validateSecondaryMetrics(
@@ -61,8 +95,8 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
       const currentResults = readCurrentSegmentResults(cwd, state.currentSegment);
       const experiment: AutoresearchResultEntry = {
         run: state.currentRunCount + 1,
-        commit: params.commit.slice(0, 7),
-        metric: params.metric,
+        commit: inferredCommit.slice(0, 7),
+        metric: inferredMetric,
         metrics: secondaryMetrics,
         status: params.status,
         description: params.description,
@@ -83,7 +117,7 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
           cwd: cwd,
           description: params.description,
           metricName: state.metricName,
-          metric: params.metric,
+          metric: inferredMetric,
           metrics: secondaryMetrics,
           commit: experiment.commit,
           status: "keep",
@@ -138,7 +172,16 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
       );
       const nextState: AutoresearchStateSnapshot = reconstructStateFromJsonl(cwd);
       const queuedSteers = consumeAutoresearchSteers(cwd);
+      consumeAutoresearchPendingRun(cwd);
       setAutoresearchRunInFlight(cwd, false);
+      const nextCheckpoint = writeAutoresearchCheckpoint({
+        cwd,
+        state: nextState,
+        sessionStartCommit: checkpoint?.sessionStartCommit ?? experiment.commit,
+        recentLoggedRuns: readRecentLoggedRuns(cwd, 8),
+        pendingRun: null,
+      });
+      syncAutoresearchSessionDoc(cwd, nextCheckpoint);
 
       return {
         content: [
@@ -153,6 +196,7 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
               gitSummary,
               knownSecondaryMetrics,
               queuedSteers,
+              usedPendingRun: pendingRun !== null,
             }),
           },
         ],
@@ -304,6 +348,7 @@ function buildResultText(options: {
   gitSummary: string;
   knownSecondaryMetrics: readonly SecondaryMetricDef[];
   queuedSteers: readonly string[];
+  usedPendingRun: boolean;
 }): string {
   let text = `Logged #${options.experiment.run}: ${options.experiment.status} - ${options.experiment.description}`;
   text += `\nBaseline ${options.state.metricName}: ${formatMetric(options.baselineMetric, options.state.metricUnit)}`;
@@ -338,6 +383,9 @@ function buildResultText(options: {
   }
 
   text += `\n(${options.totalRunCount} experiments in current segment)`;
+  if (options.usedPendingRun) {
+    text += "\nUsed the pending run_experiment result as the source of truth for commit/metric defaults.";
+  }
   text += `\n${options.gitSummary}`;
 
   if (options.queuedSteers.length > 0) {

@@ -5,6 +5,7 @@ export const AUTORESEARCH_ROOT_FILES = {
   runnerScript: "autoresearch.sh",
   resultsLog: "autoresearch.jsonl",
   ideasBacklog: "autoresearch.ideas.md",
+  checkpoint: "autoresearch.checkpoint.json",
 } as const;
 
 export type AutoresearchRootFileKey = keyof typeof AUTORESEARCH_ROOT_FILES;

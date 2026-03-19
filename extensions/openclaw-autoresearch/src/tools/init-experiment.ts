@@ -3,9 +3,14 @@ import { InitExperimentParams } from "./schemas.js";
 import { createConfigHeader, writeConfigHeader } from "../logging.js";
 import {
   createEmptyStateSnapshot,
+  readRecentLoggedRuns,
   reconstructStateFromJsonl,
   type AutoresearchStateSnapshot,
 } from "../state.js";
+import { readAutoresearchCheckpoint, writeAutoresearchCheckpoint } from "../checkpoint.js";
+import { syncAutoresearchSessionDoc } from "../session-doc.js";
+import { readShortHeadCommit } from "../git.js";
+import { setAutoresearchPendingRun, setAutoresearchRunInFlight } from "../runtime-state.js";
 import { resolveToolCwd } from "./tool-cwd.js";
 
 export function createInitExperimentTool(api: OpenClawPluginApi) {
@@ -29,6 +34,7 @@ export function createInitExperimentTool(api: OpenClawPluginApi) {
     ) {
       const cwd = resolveToolCwd(api, params.cwd);
       const previousState = reconstructStateFromJsonl(cwd);
+      const previousCheckpoint = readAutoresearchCheckpoint(cwd);
       const isReinit = previousState.currentRunCount > 0;
       const nextState: AutoresearchStateSnapshot = {
         ...createEmptyStateSnapshot(),
@@ -66,6 +72,23 @@ export function createInitExperimentTool(api: OpenClawPluginApi) {
         };
       }
 
+      setAutoresearchPendingRun(cwd, null);
+      setAutoresearchRunInFlight(cwd, false);
+
+      const nextPersistentState = reconstructStateFromJsonl(cwd);
+      const sessionStartCommit = await readShortHeadCommit({
+        runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
+        cwd,
+      });
+      const checkpoint = writeAutoresearchCheckpoint({
+        cwd,
+        state: nextPersistentState,
+        sessionStartCommit: sessionStartCommit ?? previousCheckpoint?.sessionStartCommit ?? null,
+        recentLoggedRuns: readRecentLoggedRuns(cwd, 8),
+        pendingRun: null,
+      });
+      syncAutoresearchSessionDoc(cwd, checkpoint);
+
       const reinitNote = isReinit
         ? " (re-initialized - previous results archived, new baseline needed)"
         : "";
@@ -77,7 +100,7 @@ export function createInitExperimentTool(api: OpenClawPluginApi) {
             text:
               `Experiment initialized: "${nextState.name}"${reinitNote}\n` +
               `Metric: ${nextState.metricName} (${nextState.metricUnit || "unitless"}, ${nextState.bestDirection} is better)\n` +
-              "Config written to autoresearch.jsonl. Now run the baseline with run_experiment.",
+              "Config written to autoresearch.jsonl. Now run the baseline with run_experiment, then log it before starting another run.",
           },
         ],
         details: {

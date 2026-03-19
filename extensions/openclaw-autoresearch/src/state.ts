@@ -211,6 +211,62 @@ export function reconstructStateFromJsonl(cwd: string): AutoresearchStateSnapsho
   };
 }
 
+export function readRecentLoggedRuns(
+  cwd: string,
+  limit: number,
+): readonly AutoresearchRunSnapshot[] {
+  const jsonl = readAutoresearchRootFile(cwd, "resultsLog");
+  if (jsonl === null || limit <= 0) {
+    return [];
+  }
+
+  const runs: AutoresearchRunSnapshot[] = [];
+  let currentSegment = 0;
+  let currentRunIndex = 0;
+  let hasSeenAnyRun = false;
+
+  const lines = jsonl
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    let entry: JsonlEntry;
+    try {
+      entry = JSON.parse(line) as JsonlEntry;
+    } catch {
+      continue;
+    }
+
+    if (entry.type === "config") {
+      if (hasSeenAnyRun) {
+        currentSegment += 1;
+      }
+      currentRunIndex = 0;
+      continue;
+    }
+
+    if (typeof entry.metric !== "number") {
+      continue;
+    }
+
+    hasSeenAnyRun = true;
+    currentRunIndex += 1;
+    runs.push({
+      run: typeof entry.run === "number" ? entry.run : currentRunIndex,
+      commit: entry.commit ?? "",
+      metric: entry.metric,
+      metrics: normalizeMetrics(entry.metrics),
+      status: entry.status ?? "keep",
+      description: entry.description ?? "",
+      timestamp: typeof entry.timestamp === "number" ? entry.timestamp : 0,
+      segment: typeof entry.segment === "number" ? entry.segment : currentSegment,
+    });
+  }
+
+  return runs.slice(-limit);
+}
+
 function normalizeMetrics(metrics: Record<string, number> | undefined): Record<string, number> {
   if (!metrics || typeof metrics !== "object") {
     return {};

@@ -19,6 +19,11 @@ export type GitKeepResult = {
   readonly command: GitCommandResult;
 };
 
+export type GitRuntimeOptions = {
+  runCommandWithTimeout: RunCommandWithTimeout;
+  cwd: string;
+};
+
 async function runGitCommand(
   runCommandWithTimeout: RunCommandWithTimeout,
   cwd: string,
@@ -38,6 +43,31 @@ async function runGitCommand(
     stderr,
     combinedOutput,
   };
+}
+
+export async function readShortHeadCommit(options: GitRuntimeOptions): Promise<string | null> {
+  const result = await runGitCommand(options.runCommandWithTimeout, options.cwd, [
+    "rev-parse",
+    "--short=7",
+    "HEAD",
+  ]);
+  return result.code === 0 && result.stdout.trim().length > 0 ? result.stdout.trim() : null;
+}
+
+export async function countCommitsSince(
+  options: GitRuntimeOptions & { sinceCommit: string },
+): Promise<number | null> {
+  const result = await runGitCommand(options.runCommandWithTimeout, options.cwd, [
+    "rev-list",
+    "--count",
+    `${options.sinceCommit}..HEAD`,
+  ]);
+  if (result.code !== 0) {
+    return null;
+  }
+
+  const count = Number.parseInt(result.stdout.trim(), 10);
+  return Number.isFinite(count) ? count : null;
 }
 
 export async function commitKeptExperiment(options: {

@@ -45,11 +45,18 @@ export const RunExperimentParams = Type.Object({
 
 export const LogExperimentParams = Type.Object({
   cwd: CwdParam,
-  commit: Type.String({ description: "Git commit hash (short, 7 chars)" }),
-  metric: Type.Number({
-    description:
-      "The primary optimization metric value (e.g. seconds, val_bpb). Use 0 for crashes.",
-  }),
+  commit: Type.Optional(
+    Type.String({
+      description:
+        "Git commit hash (short, 7 chars). Optional when logging the most recent run_experiment result.",
+    }),
+  ),
+  metric: Type.Optional(
+    Type.Number({
+      description:
+        "The primary optimization metric value (e.g. seconds, val_bpb). Optional when run_experiment already captured a METRIC line for the configured primary metric.",
+    }),
+  ),
   status: Type.String({
     description: "Result status for this experiment.",
     enum: ["keep", "discard", "crash"],

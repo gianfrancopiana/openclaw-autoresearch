@@ -90,6 +90,7 @@ describe("autoresearch hooks", () => {
     registerAutoresearchHooks(api as never);
 
     expect(handlers.has("message_received")).toBe(true);
+    expect(handlers.has("before_tool_call")).toBe(true);
 
     setAutoresearchRunInFlight(cwd, false);
     handlers.get("message_received")?.({ text: "ignore this" }, { cwd });
@@ -102,5 +103,25 @@ describe("autoresearch hooks", () => {
     expect(getAutoresearchRuntimeState(cwd).queuedSteers).toEqual([
       "try branchless parsing",
     ]);
+
+    const blocked = handlers.get("before_tool_call")?.(
+      {
+        toolName: "exec",
+        params: { command: "npm test" },
+      },
+      { cwd },
+    ) as { block?: boolean; blockReason?: string } | undefined;
+    expect(blocked).toMatchObject({
+      block: true,
+    });
+
+    const allowed = handlers.get("before_tool_call")?.(
+      {
+        toolName: "exec",
+        params: { command: "git status --short" },
+      },
+      { cwd },
+    );
+    expect(allowed).toBeUndefined();
   });
 });

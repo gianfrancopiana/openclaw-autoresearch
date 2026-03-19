@@ -160,7 +160,7 @@ describe("autoresearch tools", () => {
     );
 
     expect(runResult.details).toMatchObject({ passed: true, timedOut: false });
-    expect(runResult.details.stdout.trim()).toBe(repoCwd);
+    expect((runResult.details as { stdout: string }).stdout.trim()).toBe(repoCwd);
 
     const statusResult = await createAutoresearchStatusTool(api as never).execute(
       "call-3",

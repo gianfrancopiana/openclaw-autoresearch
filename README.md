@@ -13,19 +13,20 @@ Three tools drive the loop:
 | Tool | What it does |
 |---|---|
 | `init_experiment` | Configures the session: name, primary metric, unit, direction (lower/higher). Re-calling starts a new segment. |
-| `run_experiment` | Executes a shell command, times it, captures stdout/stderr, returns pass/fail via exit code. |
-| `log_experiment` | Records the result. `keep` auto-commits to git. `discard`/`crash` log without committing. Tracks secondary metrics alongside the primary. |
+| `run_experiment` | Executes a shell command, times it, captures stdout/stderr, parses `METRIC name=number` lines, and opens a pending experiment window that must be logged before another run can start. |
+| `log_experiment` | Records the pending run. `keep` auto-commits to git. `discard`/`crash` log without committing. If the prior `run_experiment` captured the primary metric, `log_experiment` can infer `commit` and `metric` automatically. |
 
 Each tool also accepts an optional `cwd` so callers can target a nested repo explicitly instead of relying on the current session working directory.
 
-All state lives in four repo-root files:
+All state lives in five repo-root files:
 
 | File | Purpose |
 |---|---|
-| `autoresearch.md` | Session doc: objective, metrics, files in scope, constraints, what's been tried. A fresh agent reads this to resume. |
+| `autoresearch.md` | Session doc. The plugin keeps the Metrics, How to Run, What's Been Tried, and Plugin Checkpoint sections synchronized so resumes are less agent-dependent. |
 | `autoresearch.sh` | Benchmark script. Outputs `METRIC name=number` lines. |
 | `autoresearch.jsonl` | Structured log: config headers + experiment entries (metric, status, timestamp, segment, commit hash). |
 | `autoresearch.ideas.md` | Backlog of promising ideas not yet tried. Optional. |
+| `autoresearch.checkpoint.json` | Plugin-managed checkpoint: latest logged state, recent runs, and any pending unlogged run. |
 
 The design is file-first: any agent can pick up the repo-root files and continue the loop without prior context.
 
@@ -72,6 +73,14 @@ Verify:
 
 Prefer the explicit `/autoresearch` command surface in OpenClaw. The auto-generated native skill alias `/autoresearch_create` may not trigger reliably on some hosts, so use `/skill autoresearch-create` if you need to invoke the skill directly.
 
+## Workflow Guarantees
+
+- `run_experiment` refuses to start a second run until the previous one is logged.
+- `run_experiment` parses `METRIC name=number` lines and stores a pending run so `log_experiment` can default from the actual benchmark output.
+- During active autoresearch mode, raw benchmark execution through OpenClaw `exec`/`bash` is blocked. Use `run_experiment` instead.
+- `autoresearch_status` warns when a pending run is unlogged or git history has moved ahead of the last logged experiment.
+- The plugin updates `autoresearch.checkpoint.json` and refreshes plugin-managed sections in `autoresearch.md` after init, run, and log transitions.
+
 ## Use
 
 In the repo you want to optimize:
@@ -80,7 +89,7 @@ In the repo you want to optimize:
 2. Run `/autoresearch` or `/autoresearch setup <goal>`.
 3. Send a normal message with the goal, command, metric (+ direction), files in scope, and constraints.
 4. If you need the raw skill invocation, use `/skill autoresearch-create`.
-5. The agent writes `autoresearch.md` and `autoresearch.sh`, runs a baseline, then starts looping.
+5. The agent writes `autoresearch.md` and `autoresearch.sh`, runs a baseline with `run_experiment`, then records it with `log_experiment`.
 6. Use `/autoresearch` or `/autoresearch status` to re-prime context on a later turn.
 
 To resume an existing session, a new agent reads the repo-root files and continues from where the last one stopped.
