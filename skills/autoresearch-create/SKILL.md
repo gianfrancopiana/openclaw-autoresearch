@@ -9,14 +9,14 @@ Autonomous experiment loop: try ideas, keep what works, discard what doesn't, ne
 
 ## Tools
 
-- **`init_experiment`** — configure session (name, metric, unit, direction). Call again to re-initialize with a new baseline when the optimization target changes.
+- **`init_experiment`** — configure session (name, metric, unit, direction). Once runs exist, calling it again requires `reset: true` to start a new segment explicitly.
 - **`run_experiment`** — runs the benchmark command, times it, captures output, parses `METRIC name=number` lines, and opens a pending run that must be logged before another run can start.
-- **`log_experiment`** — records the pending run. `keep` auto-commits. `discard`/`crash` → `git checkout -- .` to revert. If the previous `run_experiment` captured the primary metric, `commit` and `metric` can be omitted and will default from the pending run.
+- **`log_experiment`** — records the pending run. The first logged run in a segment becomes the baseline automatically. `keep` auto-commits. `discard`/`crash` → `git checkout -- .` to revert. `discard` also requires an `idea` note so the failed path gets appended to `autoresearch.ideas.md`. If the previous `run_experiment` captured the primary metric, `commit` and `metric` can be omitted and will default from the pending run.
 
 ## Setup
 
 1. Ask (or infer): **Goal**, **Command**, **Metric** (+ direction), **Files in scope**, **Constraints**.
-2. `git checkout -b autoresearch/<goal>-<date>`
+2. If `autoresearch.checkpoint.json` already names a canonical branch, reuse it. Otherwise create one with `git checkout -b autoresearch/<goal>-<date>` and keep using that branch for the whole loop.
 3. Read the source files. Understand the workload deeply before writing anything.
 4. Write `autoresearch.md` and `autoresearch.sh` (see below). Commit both.
 5. `init_experiment` → `run_experiment` baseline → `log_experiment` → start looping immediately.
@@ -68,7 +68,10 @@ Bash script (`set -euo pipefail`) that: pre-checks fast (syntax errors in <1s), 
 - **Crashes:** fix if trivial, otherwise log and move on. Don't over-invest.
 - **Think longer when stuck.** Re-read source files, study the profiling data, reason about what the CPU is actually doing. The best ideas come from deep understanding, not from trying random variations.
 - **Resuming:** if `autoresearch.md` exists, read it plus `autoresearch.checkpoint.json`, then continue looping.
+- **Respect the canonical branch.** If the checkpoint names a canonical branch, switch back to it before resuming. Do not create a fresh autoresearch branch for every session.
+- **Respect the lock file.** If `autoresearch.lock` exists and the PID is alive, another loop is active. Resume that loop instead of forking a second session.
 - **No raw benchmark exec:** during active autoresearch mode, benchmark/test commands should go through `run_experiment`, not raw `exec`/`bash`.
+- **Reset explicitly.** If you need a new segment, call `init_experiment` with `reset: true`; do not silently wipe the current baseline.
 
 **NEVER STOP.** The user may be away for hours. Keep going until interrupted.
 

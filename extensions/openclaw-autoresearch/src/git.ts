@@ -54,6 +54,14 @@ export async function readShortHeadCommit(options: GitRuntimeOptions): Promise<s
   return result.code === 0 && result.stdout.trim().length > 0 ? result.stdout.trim() : null;
 }
 
+export async function readCurrentBranch(options: GitRuntimeOptions): Promise<string | null> {
+  const result = await runGitCommand(options.runCommandWithTimeout, options.cwd, [
+    "branch",
+    "--show-current",
+  ]);
+  return result.code === 0 && result.stdout.trim().length > 0 ? result.stdout.trim() : null;
+}
+
 export async function countCommitsSince(
   options: GitRuntimeOptions & { sinceCommit: string },
 ): Promise<number | null> {

@@ -1,6 +1,8 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { AUTORESEARCH_ROOT_FILES } from "./files.js";
 import { reconstructStateFromJsonl } from "./state.js";
+import { readAutoresearchCheckpoint } from "./checkpoint.js";
+import { formatConfidenceLine } from "./confidence.js";
 import {
   clearAutoresearchRuntimeState,
   consumeAutoresearchContinuationReminder,
@@ -9,6 +11,7 @@ import {
   queueAutoresearchSteer,
   setAutoresearchContinuationReminder,
 } from "./runtime-state.js";
+import { removeAutoresearchSessionLock } from "./session-lock.js";
 
 type BeforeAgentStartEvent = {
   systemPrompt?: string;
@@ -106,6 +109,7 @@ export function registerAutoresearchHooks(api: OpenClawPluginApi): void {
         return;
       }
 
+      removeAutoresearchSessionLock(cwd);
       clearAutoresearchRuntimeState(cwd);
     });
     return;
@@ -136,6 +140,7 @@ export function registerAutoresearchHooks(api: OpenClawPluginApi): void {
 export function buildBeforePromptBuildContext(cwd: string): string | null {
   const state = reconstructStateFromJsonl(cwd);
   const runtimeState = getAutoresearchRuntimeState(cwd);
+  const checkpoint = readAutoresearchCheckpoint(cwd);
   if (!shouldEnforceAutoresearchMode(cwd, state, runtimeState)) {
     return null;
   }
@@ -166,7 +171,24 @@ export function buildBeforePromptBuildContext(cwd: string): string | null {
       "Use init_experiment, run_experiment, and log_experiment for experiment state changes. Never stop unless the user explicitly interrupts the loop.",
       "Never run benchmark or test commands through raw exec/bash during autoresearch mode. Use run_experiment so the plugin can capture metrics, enforce logging, and preserve resumable state.",
       "After every run_experiment, call log_experiment before starting another run. If METRIC lines were captured, log_experiment can infer commit and metric from the pending run.",
+      "Once runs have been logged, init_experiment requires reset: true before starting a new segment.",
+      `Discarded experiments must include an idea note in log_experiment so it can be appended to ${AUTORESEARCH_ROOT_FILES.ideasBacklog}.`,
     );
+    if (state.confidence !== null) {
+      lines.push(
+        `${formatConfidenceLine(state.confidence, "Current confidence")}. Treat low-confidence wins as provisional and re-run before keeping when the score is below 1.0x.`,
+      );
+    }
+    if (checkpoint?.canonicalBranch) {
+      lines.push(
+        `Canonical branch: ${checkpoint.canonicalBranch}. Continue on this branch instead of creating a new autoresearch/* lineage.`,
+      );
+    }
+    if (checkpoint?.carryForwardContext) {
+      lines.push(
+        `Carry-forward best context from the previous segment: ${checkpoint.carryForwardContext.metricName} ${checkpoint.carryForwardContext.run.metric}${checkpoint.carryForwardContext.metricUnit} on ${checkpoint.carryForwardContext.run.commit}.`,
+      );
+    }
     if (pendingCommand?.args) {
       lines.push(`Additional resume instruction from /autoresearch: ${pendingCommand.args}`);
     }

@@ -115,6 +115,7 @@ describe("autoresearch tools", () => {
         metric: 5,
         status: "discard",
         description: "baseline",
+        idea: "keep a discard note so follow-up experiments are not lost",
       },
       new AbortController().signal,
       undefined,
@@ -122,7 +123,7 @@ describe("autoresearch tools", () => {
 
     expect(api.resolvePath).toHaveBeenCalledWith(".");
     expect(result.details).toMatchObject({ status: "ok" });
-    expect(result.content[0]?.text).toContain("Logged #1: discard - baseline");
+    expect(result.content[0]?.text).toContain("Logged #1: baseline - baseline");
   });
 
   it("supports explicit cwd overrides for nested repo tool execution", async () => {
@@ -179,12 +180,13 @@ describe("autoresearch tools", () => {
         metric: 5,
         status: "discard",
         description: "baseline",
+        idea: "keep a discard note so follow-up experiments are not lost",
       },
       new AbortController().signal,
       undefined,
     );
 
     expect(logResult.details).toMatchObject({ status: "ok" });
-    expect(logResult.content[0]?.text).toContain("Logged #1: discard - baseline");
+    expect(logResult.content[0]?.text).toContain("Logged #1: baseline - baseline");
   });
 });

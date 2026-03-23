@@ -1,9 +1,10 @@
 import * as fs from "node:fs";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { LogExperimentParams } from "./schemas.js";
-import { commitKeptExperiment, readShortHeadCommit } from "../git.js";
+import { commitKeptExperiment, readCurrentBranch, readShortHeadCommit } from "../git.js";
 import { appendResultEntry, type AutoresearchResultEntry } from "../logging.js";
 import { getAutoresearchRootFilePath } from "../files.js";
+import { appendIdeaBacklogEntry } from "../ideas.js";
 import {
   readRecentLoggedRuns,
   reconstructStateFromJsonl,
@@ -19,6 +20,8 @@ import {
 import { resolveToolCwd } from "./tool-cwd.js";
 import { readAutoresearchCheckpoint, writeAutoresearchCheckpoint } from "../checkpoint.js";
 import { syncAutoresearchSessionDoc } from "../session-doc.js";
+import { computeConfidence, formatConfidenceLine } from "../confidence.js";
+import { acquireAutoresearchSessionLock } from "../session-lock.js";
 
 export function createLogExperimentTool(api: OpenClawPluginApi) {
   return {
@@ -35,6 +38,7 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
         metric?: number;
         status: "keep" | "discard" | "crash";
         description: string;
+        idea?: string;
         metrics?: Record<string, number>;
         force?: boolean;
       },
@@ -42,6 +46,26 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
       _onUpdate: unknown,
     ) {
       const cwd = resolveToolCwd(api, params.cwd);
+      const lockStatus = acquireAutoresearchSessionLock(cwd);
+      if (lockStatus.state === "active" && !lockStatus.ownedByCurrentProcess) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                "Another autoresearch loop is already active for this repo.\n" +
+                `Lock owner PID: ${lockStatus.pid}\n` +
+                `Started: ${new Date(lockStatus.timestamp ?? 0).toISOString()}\n` +
+                "Resume that loop instead of logging results from a parallel session.",
+            },
+          ],
+          details: {
+            status: "error",
+            phase: "lock",
+          },
+        };
+      }
+
       const checkpoint = readAutoresearchCheckpoint(cwd);
       const pendingRun = getAutoresearchPendingRun(cwd) ?? checkpoint?.pendingRun ?? null;
       const state = reconstructStateFromJsonl(cwd);
@@ -74,6 +98,23 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
         };
       }
 
+      if (params.status === "discard" && !(params.idea ?? "").trim()) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                "Discarded experiments must record what was learned.\n" +
+                'Provide idea with a short note like "cache key was too coarse; retry with per-file invalidation". It will be appended to autoresearch.ideas.md automatically.',
+            },
+          ],
+          details: {
+            status: "error",
+            phase: "idea_required",
+          },
+        };
+      }
+
       if (state.secondaryMetrics.length > 0) {
         const validationError = validateSecondaryMetrics(
           state.secondaryMetrics,
@@ -93,15 +134,18 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
 
       const knownSecondaryMetrics = mergeSecondaryMetrics(state.secondaryMetrics, secondaryMetrics);
       const currentResults = readCurrentSegmentResults(cwd, state.currentSegment);
+      const isBaselineRun = currentResults.length === 0;
       const experiment: AutoresearchResultEntry = {
         run: state.currentRunCount + 1,
         commit: inferredCommit.slice(0, 7),
         metric: inferredMetric,
         metrics: secondaryMetrics,
         status: params.status,
+        baseline: isBaselineRun,
         description: params.description,
         timestamp: Date.now(),
         segment: state.currentSegment,
+        confidence: null,
       };
       let finalExperiment = experiment;
 
@@ -145,6 +189,21 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
         };
       }
 
+      finalExperiment = {
+        ...finalExperiment,
+        confidence: computeConfidence(
+          [
+            ...currentResults,
+            {
+              metric: finalExperiment.metric,
+              metrics: finalExperiment.metrics,
+              status: finalExperiment.status,
+            },
+          ],
+          state.bestDirection,
+        ),
+      };
+
       try {
         appendResultEntry(cwd, finalExperiment);
       } catch (error) {
@@ -164,6 +223,12 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
         };
       }
 
+      let ideaAppended = false;
+      if ((params.idea ?? "").trim()) {
+        appendIdeaBacklogEntry(cwd, params.idea ?? "");
+        ideaAppended = true;
+      }
+
       const baselineMetric =
         currentResults.length > 0 ? currentResults[0].metric : experiment.metric;
       const baselineSecondaryMetrics = findBaselineSecondaryMetrics(
@@ -174,10 +239,16 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
       const queuedSteers = consumeAutoresearchSteers(cwd);
       consumeAutoresearchPendingRun(cwd);
       setAutoresearchRunInFlight(cwd, false);
+      const currentBranch = await readCurrentBranch({
+        runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
+        cwd,
+      });
       const nextCheckpoint = writeAutoresearchCheckpoint({
         cwd,
         state: nextState,
         sessionStartCommit: checkpoint?.sessionStartCommit ?? experiment.commit,
+        canonicalBranch: checkpoint?.canonicalBranch ?? currentBranch,
+        carryForwardContext: checkpoint?.carryForwardContext ?? null,
         recentLoggedRuns: readRecentLoggedRuns(cwd, 8),
         pendingRun: null,
       });
@@ -197,6 +268,9 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
               knownSecondaryMetrics,
               queuedSteers,
               usedPendingRun: pendingRun !== null,
+              baseline: isBaselineRun,
+              ideaAppended,
+              confidence: finalExperiment.confidence,
             }),
           },
         ],
@@ -214,6 +288,7 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
 type CurrentSegmentResult = {
   readonly metric: number;
   readonly metrics: Record<string, number>;
+  readonly status: "keep" | "discard" | "crash";
 };
 
 function validateSecondaryMetrics(
@@ -303,6 +378,10 @@ function readCurrentSegmentResults(cwd: string, segment: number): CurrentSegment
         entry.metrics && typeof entry.metrics === "object"
           ? (entry.metrics as Record<string, number>)
           : {},
+      status:
+        entry.status === "keep" || entry.status === "discard" || entry.status === "crash"
+          ? entry.status
+          : "keep",
     });
   }
 
@@ -349,8 +428,13 @@ function buildResultText(options: {
   knownSecondaryMetrics: readonly SecondaryMetricDef[];
   queuedSteers: readonly string[];
   usedPendingRun: boolean;
+  baseline: boolean;
+  ideaAppended: boolean;
+  confidence: number | null;
 }): string {
-  let text = `Logged #${options.experiment.run}: ${options.experiment.status} - ${options.experiment.description}`;
+  let text = options.baseline
+    ? `Logged #${options.experiment.run}: baseline - ${options.experiment.description}`
+    : `Logged #${options.experiment.run}: ${options.experiment.status} - ${options.experiment.description}`;
   text += `\nBaseline ${options.state.metricName}: ${formatMetric(options.baselineMetric, options.state.metricUnit)}`;
 
   if (options.experiment.run > 1 && options.experiment.status === "keep" && options.experiment.metric > 0) {
@@ -382,9 +466,19 @@ function buildResultText(options: {
     text += `\nSecondary: ${parts.join("  ")}`;
   }
 
+  if (options.confidence !== null) {
+    text += `\n${formatConfidenceLine(options.confidence)}`;
+  }
+
   text += `\n(${options.totalRunCount} experiments in current segment)`;
   if (options.usedPendingRun) {
     text += "\nUsed the pending run_experiment result as the source of truth for commit/metric defaults.";
+  }
+  if (options.baseline) {
+    text += "\nThis run established the baseline for the current segment.";
+  }
+  if (options.ideaAppended) {
+    text += "\nAdded a follow-up idea to autoresearch.ideas.md.";
   }
   text += `\n${options.gitSummary}`;
 

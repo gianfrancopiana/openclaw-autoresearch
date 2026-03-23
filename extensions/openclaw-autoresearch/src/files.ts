@@ -6,6 +6,7 @@ export const AUTORESEARCH_ROOT_FILES = {
   resultsLog: "autoresearch.jsonl",
   ideasBacklog: "autoresearch.ideas.md",
   checkpoint: "autoresearch.checkpoint.json",
+  sessionLock: "autoresearch.lock",
 } as const;
 
 export type AutoresearchRootFileKey = keyof typeof AUTORESEARCH_ROOT_FILES;
@@ -29,10 +30,6 @@ export function readAutoresearchRootFile(
   return fs.readFileSync(filePath, "utf8");
 }
 
-/**
- * PR 2 skeleton only.
- * This module will own canonical root-level file IO helpers in later PRs.
- */
 export function describeCanonicalFiles(): typeof AUTORESEARCH_ROOT_FILES {
   return AUTORESEARCH_ROOT_FILES;
 }

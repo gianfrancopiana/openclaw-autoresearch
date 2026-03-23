@@ -6,6 +6,7 @@ Pinned upstream reference:
 
 - Repo: `https://github.com/davebcn87/pi-autoresearch`
 - Commit: `2227029fa5712944a36938b5fe59f709cb30ed22` (`2227029f`)
+- Later upstream semantics also ported: confidence scoring from `cf1bbf03debca8f3fb2cca2c3e799b9e23320f87` (`cf1bbf0`)
 
 ## Principle
 

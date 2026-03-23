@@ -16,6 +16,7 @@ describe("reconstructStateFromJsonl", () => {
     expect(state.totalRunCount).toBe(4);
     expect(state.currentBaselineMetric).toBe(130);
     expect(state.currentBestMetric).toBe(118);
+    expect(state.confidence).toBeNull();
     expect(state.lastRun).toMatchObject({
       run: 2,
       commit: "7654321",
@@ -23,6 +24,7 @@ describe("reconstructStateFromJsonl", () => {
       status: "keep",
       description: "keep winner",
       segment: 1,
+      confidence: null,
     });
     expect(state.secondaryMetrics).toEqual([
       { name: "compile_ms", unit: "ms" },

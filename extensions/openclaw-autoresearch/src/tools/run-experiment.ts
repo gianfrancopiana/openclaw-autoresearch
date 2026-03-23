@@ -8,10 +8,11 @@ import {
 } from "../runtime-state.js";
 import { resolveToolCwd } from "./tool-cwd.js";
 import { parseMetricLines } from "../metrics.js";
-import { readShortHeadCommit } from "../git.js";
+import { readCurrentBranch, readShortHeadCommit } from "../git.js";
 import { readAutoresearchCheckpoint, writeAutoresearchCheckpoint } from "../checkpoint.js";
 import { readRecentLoggedRuns, reconstructStateFromJsonl } from "../state.js";
 import { syncAutoresearchSessionDoc } from "../session-doc.js";
+import { acquireAutoresearchSessionLock } from "../session-lock.js";
 
 export function createRunExperimentTool(api: OpenClawPluginApi) {
   return {
@@ -31,6 +32,26 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
       onUpdate: ((update: unknown) => void | Promise<void>) | undefined,
     ) {
       const cwd = resolveToolCwd(api, params.cwd);
+      const lockStatus = acquireAutoresearchSessionLock(cwd);
+      if (lockStatus.state === "active" && !lockStatus.ownedByCurrentProcess) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                "Another autoresearch loop is already active for this repo.\n" +
+                `Lock owner PID: ${lockStatus.pid}\n` +
+                `Started: ${new Date(lockStatus.timestamp ?? 0).toISOString()}\n` +
+                "Resume that loop instead of running a parallel experiment session.",
+            },
+          ],
+          details: {
+            status: "error",
+            phase: "lock",
+          },
+        };
+      }
+
       const checkpoint = readAutoresearchCheckpoint(cwd);
       const existingPendingRun = getAutoresearchPendingRun(cwd) ?? checkpoint?.pendingRun ?? null;
 
@@ -96,6 +117,10 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
         runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
         cwd,
       });
+      const currentBranch = await readCurrentBranch({
+        runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
+        cwd,
+      });
       const pendingRun = {
         command: params.command,
         commit: currentCommit,
@@ -113,6 +138,8 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
         cwd,
         state,
         sessionStartCommit: checkpoint?.sessionStartCommit ?? currentCommit,
+        canonicalBranch: checkpoint?.canonicalBranch ?? currentBranch,
+        carryForwardContext: checkpoint?.carryForwardContext ?? null,
         recentLoggedRuns: readRecentLoggedRuns(cwd, 8),
         pendingRun,
       });

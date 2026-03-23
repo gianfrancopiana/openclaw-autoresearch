@@ -14,6 +14,11 @@ import {
   setAutoresearchRunInFlight,
   setAutoresearchRuntimeMode,
 } from "../runtime-state.js";
+import {
+  acquireAutoresearchSessionLock,
+  getAutoresearchSessionLockStatus,
+  removeAutoresearchSessionLock,
+} from "../session-lock.js";
 
 type CommandContext = {
   args?: string;
@@ -59,6 +64,7 @@ export function registerAutoresearchCommand(api: OpenClawPluginApi): void {
         setAutoresearchPendingCommand(cwd, null);
         clearAutoresearchSteers(cwd);
         setAutoresearchRunInFlight(cwd, false);
+        removeAutoresearchSessionLock(cwd);
         return {
           text: [
             "Autoresearch mode OFF.",
@@ -86,7 +92,11 @@ export function buildAutoresearchCommandText(
 ): string {
   const runtimeState = getAutoresearchRuntimeState(cwd);
   const presentFiles = getPresentCanonicalFiles(cwd);
-  const hasSession = presentFiles.length > 0;
+  const presentSessionFiles = presentFiles.filter(
+    (file) => file !== AUTORESEARCH_ROOT_FILES.sessionLock,
+  );
+  const hasSession = presentSessionFiles.length > 0;
+  const lockStatus = getAutoresearchSessionLockStatus(cwd);
 
   if (!hasSession) {
     return [
@@ -95,6 +105,7 @@ export function buildAutoresearchCommandText(
       `Expected canonical files: ${Object.values(AUTORESEARCH_ROOT_FILES).join(", ")}`,
       "Recommended OpenClaw entrypoint: `/autoresearch` or `/autoresearch setup <goal>`.",
       "Direct skill fallback: `/skill autoresearch-create`.",
+      `Session lock: ${formatLockStatus(lockStatus)}`,
     ].join("\n");
   }
 
@@ -105,7 +116,7 @@ export function buildAutoresearchCommandText(
   ];
 
   if (mode === "status") {
-    lines.push("", formatAutoresearchStatusText(state, runtimeState));
+    lines.push("", formatAutoresearchStatusText(state, runtimeState), `Session lock: ${formatLockStatus(lockStatus)}`);
   } else if (state.mode === "active" || state.hasSessionDoc) {
     lines.push(
       "Use `/autoresearch` or `/autoresearch on` to enable mode for the next agent turn, then continue the upstream loop with `init_experiment`, `run_experiment`, and `log_experiment` as needed.",
@@ -120,9 +131,18 @@ export function buildAutoresearchCommandText(
 }
 
 function enableAutoresearchMode(cwd: string, args: string | null): string {
+  const lockStatus = acquireAutoresearchSessionLock(cwd);
+  if (lockStatus.state === "active" && !lockStatus.ownedByCurrentProcess) {
+    return [
+      "Autoresearch mode NOT enabled.",
+      `Another live autoresearch loop holds autoresearch.lock (PID ${lockStatus.pid}, started ${new Date(lockStatus.timestamp ?? 0).toISOString()}).`,
+      "Resume that loop instead of creating a parallel session.",
+    ].join("\n");
+  }
+
   setAutoresearchRuntimeMode(cwd, "on");
   const presentFiles = getPresentCanonicalFiles(cwd);
-  const hasSession = presentFiles.length > 0;
+  const hasSession = presentFiles.some((file) => file !== AUTORESEARCH_ROOT_FILES.sessionLock);
 
   if (!hasSession) {
     setAutoresearchPendingCommand(cwd, {
@@ -150,6 +170,15 @@ function enableAutoresearchMode(cwd: string, args: string | null): string {
 }
 
 function primeAutoresearchSetup(cwd: string, args: string | null): string {
+  const lockStatus = acquireAutoresearchSessionLock(cwd);
+  if (lockStatus.state === "active" && !lockStatus.ownedByCurrentProcess) {
+    return [
+      "Autoresearch setup NOT primed.",
+      `Another live autoresearch loop holds autoresearch.lock (PID ${lockStatus.pid}, started ${new Date(lockStatus.timestamp ?? 0).toISOString()}).`,
+      "Resume that loop instead of starting a parallel setup flow.",
+    ].join("\n");
+  }
+
   setAutoresearchRuntimeMode(cwd, "on");
   setAutoresearchPendingCommand(cwd, {
     kind: "setup",
@@ -179,4 +208,15 @@ function getPresentCanonicalFiles(cwd: string): string[] {
     }
   }
   return present;
+}
+
+function formatLockStatus(lockStatus: ReturnType<typeof getAutoresearchSessionLockStatus>): string {
+  if (lockStatus.state === "missing") {
+    return "missing";
+  }
+
+  const timestamp = lockStatus.timestamp
+    ? new Date(lockStatus.timestamp).toISOString()
+    : "unknown time";
+  return `${lockStatus.state} (pid ${lockStatus.pid}, started ${timestamp})`;
 }

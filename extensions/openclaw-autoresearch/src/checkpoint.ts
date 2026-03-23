@@ -6,10 +6,19 @@ import type {
 } from "./state.js";
 import type { PendingExperimentRun } from "./runtime-state.js";
 
+export type AutoresearchCarryForwardContext = {
+  readonly metricName: string;
+  readonly metricUnit: string;
+  readonly bestDirection: "lower" | "higher";
+  readonly run: AutoresearchRunSnapshot;
+};
+
 export type AutoresearchCheckpoint = {
   readonly version: 1;
   readonly updatedAt: number;
   readonly sessionStartCommit: string | null;
+  readonly canonicalBranch?: string | null;
+  readonly carryForwardContext?: AutoresearchCarryForwardContext | null;
   readonly session: {
     readonly name: string | null;
     readonly metricName: string;
@@ -20,6 +29,7 @@ export type AutoresearchCheckpoint = {
     readonly totalRunCount: number;
     readonly currentBaselineMetric: number | null;
     readonly currentBestMetric: number | null;
+    readonly confidence: number | null;
   };
   readonly lastLoggedRun: AutoresearchRunSnapshot | null;
   readonly recentLoggedRuns: readonly AutoresearchRunSnapshot[];
@@ -44,6 +54,8 @@ export function writeAutoresearchCheckpoint(options: {
   cwd: string;
   state: AutoresearchStateSnapshot;
   sessionStartCommit: string | null;
+  canonicalBranch: string | null;
+  carryForwardContext: AutoresearchCarryForwardContext | null;
   recentLoggedRuns: readonly AutoresearchRunSnapshot[];
   pendingRun: PendingExperimentRun | null;
 }): AutoresearchCheckpoint {
@@ -51,6 +63,8 @@ export function writeAutoresearchCheckpoint(options: {
     version: 1,
     updatedAt: Date.now(),
     sessionStartCommit: options.sessionStartCommit,
+    canonicalBranch: options.canonicalBranch,
+    carryForwardContext: options.carryForwardContext,
     session: {
       name: options.state.name,
       metricName: options.state.metricName,
@@ -61,6 +75,7 @@ export function writeAutoresearchCheckpoint(options: {
       totalRunCount: options.state.totalRunCount,
       currentBaselineMetric: options.state.currentBaselineMetric,
       currentBestMetric: options.state.currentBestMetric,
+      confidence: options.state.confidence,
     },
     lastLoggedRun: options.state.lastRun,
     recentLoggedRuns: options.recentLoggedRuns,

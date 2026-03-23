@@ -44,9 +44,11 @@ export type AutoresearchResultEntry = {
   readonly metric: number;
   readonly metrics: Record<string, number>;
   readonly status: "keep" | "discard" | "crash";
+  readonly baseline?: boolean;
   readonly description: string;
   readonly timestamp: number;
   readonly segment: number;
+  readonly confidence: number | null;
 };
 
 export function appendResultEntry(cwd: string, entry: AutoresearchResultEntry): void {

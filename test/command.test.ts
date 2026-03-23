@@ -61,6 +61,7 @@ describe("buildAutoresearchCommandText", () => {
     expect(text).toContain("Mode: active");
     expect(text).toContain("Runtime mode: auto");
     expect(text).toContain("Baseline: 101ms");
+    expect(text).toContain("Confidence: n/a");
   });
 
   it("registers a mode-aware /autoresearch command that primes resume instructions", () => {

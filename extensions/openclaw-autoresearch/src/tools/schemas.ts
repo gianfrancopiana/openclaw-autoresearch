@@ -29,6 +29,12 @@ export const InitExperimentParams = Type.Object({
       enum: ["lower", "higher"],
     }),
   ),
+  reset: Type.Optional(
+    Type.Boolean({
+      description:
+        "Required when starting a new segment after experiments have already been logged. Preserves prior history but makes the reset explicit.",
+    }),
+  ),
 });
 
 export const RunExperimentParams = Type.Object({
@@ -64,6 +70,12 @@ export const LogExperimentParams = Type.Object({
   description: Type.String({
     description: "Short description of what this experiment tried.",
   }),
+  idea: Type.Optional(
+    Type.String({
+      description:
+        "Required when status is discard. Summarize what you learned and what you would try differently; this is appended to autoresearch.ideas.md.",
+    }),
+  ),
   metrics: Type.Optional(
     Type.Record(Type.String(), Type.Number(), {
       description:

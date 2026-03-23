@@ -15,6 +15,13 @@ describe("formatAutoresearchStatusText", () => {
       warnings: ["2 commits since the last logged experiment (7654321)."],
       checkpoint: null,
       gitHead: "89abcde",
+      gitBranch: "autoresearch/parser-cache",
+      lock: {
+        state: "missing",
+        pid: null,
+        timestamp: null,
+        ownedByCurrentProcess: false,
+      },
     };
     const text = formatAutoresearchStatusText(
       reconstructStateFromJsonl(activeSessionFixture),
@@ -31,8 +38,11 @@ describe("formatAutoresearchStatusText", () => {
     expect(text).toContain("Metric: total_ms (ms, lower is better)");
     expect(text).toContain("Runs: 2 current / 4 total");
     expect(text).toContain("Best kept: 118ms");
+    expect(text).toContain("Confidence: n/a");
     expect(text).toContain("Last run: #2 keep 118ms 7654321 keep winner");
     expect(text).toContain("Git HEAD: 89abcde");
+    expect(text).toContain("Current branch: autoresearch/parser-cache");
+    expect(text).toContain("Session lock: missing");
     expect(text).toContain("Warnings:");
     expect(text).toContain("2 commits since the last logged experiment");
     expect(text).toContain(

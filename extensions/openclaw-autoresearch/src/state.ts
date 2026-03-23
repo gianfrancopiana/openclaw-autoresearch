@@ -1,4 +1,5 @@
 import { readAutoresearchRootFile } from "./files.js";
+import { computeConfidence, type ConfidenceRun } from "./confidence.js";
 
 export type SecondaryMetricDef = {
   readonly name: string;
@@ -19,9 +20,11 @@ export type AutoresearchRunSnapshot = {
   readonly metric: number;
   readonly metrics: Record<string, number>;
   readonly status: "keep" | "discard" | "crash";
+  readonly baseline: boolean;
   readonly description: string;
   readonly timestamp: number;
   readonly segment: number;
+  readonly confidence: number | null;
 };
 
 export type AutoresearchStateSnapshot = {
@@ -35,6 +38,7 @@ export type AutoresearchStateSnapshot = {
   readonly totalRunCount: number;
   readonly currentBaselineMetric: number | null;
   readonly currentBestMetric: number | null;
+  readonly confidence: number | null;
   readonly lastRun: AutoresearchRunSnapshot | null;
   readonly mode: AutoresearchMode;
   readonly hasSessionDoc: boolean;
@@ -51,6 +55,7 @@ type MutableStateSnapshot = {
   totalRunCount: number;
   currentBaselineMetric: number | null;
   currentBestMetric: number | null;
+  confidence: number | null;
   lastRun: AutoresearchRunSnapshot | null;
   mode: AutoresearchMode;
   hasSessionDoc: boolean;
@@ -68,9 +73,11 @@ type JsonlEntry = {
   readonly metric?: number;
   readonly metrics?: Record<string, number>;
   readonly status?: "keep" | "discard" | "crash";
+  readonly baseline?: boolean;
   readonly description?: string;
   readonly timestamp?: number;
   readonly segment?: number;
+  readonly confidence?: number | null;
 };
 
 export function createEmptyStateSnapshot(): AutoresearchStateSnapshot {
@@ -85,6 +92,7 @@ export function createEmptyStateSnapshot(): AutoresearchStateSnapshot {
     totalRunCount: 0,
     currentBaselineMetric: null,
     currentBestMetric: null,
+    confidence: null,
     lastRun: null,
     mode: "inactive",
     hasSessionDoc: false,
@@ -120,6 +128,7 @@ export function reconstructStateFromJsonl(cwd: string): AutoresearchStateSnapsho
   }
 
   const currentSecondaryMetrics = new Map<string, SecondaryMetricDef>();
+  let currentSegmentRuns: ConfidenceRun[] = [];
   let currentRunIndex = 0;
   let hasSeenAnyRun = false;
 
@@ -155,7 +164,9 @@ export function reconstructStateFromJsonl(cwd: string): AutoresearchStateSnapsho
       state.currentRunCount = 0;
       state.currentBaselineMetric = null;
       state.currentBestMetric = null;
+      state.confidence = null;
       currentRunIndex = 0;
+      currentSegmentRuns = [];
       currentSecondaryMetrics.clear();
       continue;
     }
@@ -168,6 +179,7 @@ export function reconstructStateFromJsonl(cwd: string): AutoresearchStateSnapsho
     currentRunIndex += 1;
     state.currentRunCount = currentRunIndex;
     state.totalRunCount += 1;
+    const isBaseline = entry.baseline === true || currentRunIndex === 1;
 
     const run: AutoresearchRunSnapshot = {
       run: typeof entry.run === "number" ? entry.run : currentRunIndex,
@@ -175,9 +187,11 @@ export function reconstructStateFromJsonl(cwd: string): AutoresearchStateSnapsho
       metric: entry.metric,
       metrics: normalizeMetrics(entry.metrics),
       status: entry.status ?? "keep",
+      baseline: isBaseline,
       description: entry.description ?? "",
       timestamp: typeof entry.timestamp === "number" ? entry.timestamp : 0,
       segment: typeof entry.segment === "number" ? entry.segment : state.currentSegment,
+      confidence: typeof entry.confidence === "number" ? entry.confidence : null,
     };
 
     if (state.currentBaselineMetric === null) {
@@ -202,11 +216,16 @@ export function reconstructStateFromJsonl(cwd: string): AutoresearchStateSnapsho
       }
     }
 
+    currentSegmentRuns.push({
+      metric: run.metric,
+      status: run.status,
+    });
     state.lastRun = run;
   }
 
   return {
     ...state,
+    confidence: computeConfidence(currentSegmentRuns, state.bestDirection),
     secondaryMetrics: [...currentSecondaryMetrics.values()],
   };
 }
@@ -215,8 +234,36 @@ export function readRecentLoggedRuns(
   cwd: string,
   limit: number,
 ): readonly AutoresearchRunSnapshot[] {
+  const runs = readAllLoggedRuns(cwd);
+  return limit <= 0 ? [] : runs.slice(-limit);
+}
+
+export function readBestLoggedRun(
+  cwd: string,
+  direction: "lower" | "higher",
+  segment?: number,
+): AutoresearchRunSnapshot | null {
+  const runs = readAllLoggedRuns(cwd).filter((run) =>
+    typeof segment === "number" ? run.segment === segment : true,
+  );
+  if (runs.length === 0) {
+    return null;
+  }
+
+  const keepRuns = runs.filter((run) => run.status === "keep");
+  const candidates = keepRuns.length > 0 ? keepRuns : runs;
+  let best = candidates[0] ?? null;
+  for (const run of candidates.slice(1)) {
+    if (!best || isBetter(run.metric, best.metric, direction)) {
+      best = run;
+    }
+  }
+  return best;
+}
+
+function readAllLoggedRuns(cwd: string): readonly AutoresearchRunSnapshot[] {
   const jsonl = readAutoresearchRootFile(cwd, "resultsLog");
-  if (jsonl === null || limit <= 0) {
+  if (jsonl === null) {
     return [];
   }
 
@@ -252,19 +299,22 @@ export function readRecentLoggedRuns(
 
     hasSeenAnyRun = true;
     currentRunIndex += 1;
+    const isBaseline = entry.baseline === true || currentRunIndex === 1;
     runs.push({
       run: typeof entry.run === "number" ? entry.run : currentRunIndex,
       commit: entry.commit ?? "",
       metric: entry.metric,
       metrics: normalizeMetrics(entry.metrics),
       status: entry.status ?? "keep",
+      baseline: isBaseline,
       description: entry.description ?? "",
       timestamp: typeof entry.timestamp === "number" ? entry.timestamp : 0,
       segment: typeof entry.segment === "number" ? entry.segment : currentSegment,
+      confidence: typeof entry.confidence === "number" ? entry.confidence : null,
     });
   }
 
-  return runs.slice(-limit);
+  return runs;
 }
 
 function normalizeMetrics(metrics: Record<string, number> | undefined): Record<string, number> {

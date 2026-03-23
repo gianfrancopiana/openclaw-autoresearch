@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import { AUTORESEARCH_ROOT_FILES, getAutoresearchRootFilePath } from "./files.js";
 import type { AutoresearchCheckpoint } from "./checkpoint.js";
+import { formatConfidenceLine } from "./confidence.js";
 
 export function syncAutoresearchSessionDoc(
   cwd: string,
@@ -65,7 +66,8 @@ function buildTriedSection(checkpoint: AutoresearchCheckpoint): string {
       const metricUnit = checkpoint.session.metricUnit;
       const renderedMetric =
         metricUnit && metricUnit.length > 0 ? `${run.metric}${metricUnit}` : `${run.metric}`;
-      return `- #${run.run} ${run.status} ${renderedMetric} ${run.commit} — ${run.description}`;
+      const baselineLabel = run.baseline ? " baseline" : "";
+      return `- #${run.run}${baselineLabel} ${run.status} ${renderedMetric} ${run.commit} — ${run.description}`;
     })
     .join("\n");
 }
@@ -76,7 +78,18 @@ function buildCheckpointSection(checkpoint: AutoresearchCheckpoint): string {
     `- Runs tracked: ${checkpoint.session.currentRunCount} current / ${checkpoint.session.totalRunCount} total`,
     `- Baseline: ${formatMetric(checkpoint.session.currentBaselineMetric, checkpoint.session.metricUnit)}`,
     `- Best kept: ${formatMetric(checkpoint.session.currentBestMetric, checkpoint.session.metricUnit)}`,
+    `- ${formatConfidenceLine(checkpoint.session.confidence)}`,
   ];
+
+  if (checkpoint.canonicalBranch) {
+    lines.push(`- Canonical branch: ${checkpoint.canonicalBranch}`);
+  }
+
+  if (checkpoint.carryForwardContext) {
+    lines.push(
+      `- Carry-forward best: ${checkpoint.carryForwardContext.metricName} ${formatMetric(checkpoint.carryForwardContext.run.metric, checkpoint.carryForwardContext.metricUnit)} from #${checkpoint.carryForwardContext.run.run} ${checkpoint.carryForwardContext.run.commit} — ${checkpoint.carryForwardContext.run.description}`,
+    );
+  }
 
   if (checkpoint.lastLoggedRun) {
     lines.push(

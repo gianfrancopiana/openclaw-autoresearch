@@ -49,6 +49,7 @@ async function initExperiment(
     metric_name: string;
     metric_unit?: string;
     direction?: "lower" | "higher";
+    reset?: boolean;
   },
 ) {
   return await createInitExperimentTool(createApi(cwd) as never).execute(
@@ -82,6 +83,7 @@ async function logExperiment(
     metric?: number;
     status: "keep" | "discard" | "crash";
     description: string;
+    idea?: string;
     metrics?: Record<string, number>;
     force?: boolean;
   },
@@ -139,6 +141,44 @@ describe("experiment lifecycle tools", () => {
     ]);
   });
 
+  it("requires reset: true before starting a new segment after logged runs exist", async () => {
+    const cwd = createTempDir("autoresearch-reset-required-");
+
+    await initExperiment(cwd, {
+      name: "Parser optimization",
+      metric_name: "total_ms",
+      metric_unit: "ms",
+      direction: "lower",
+    });
+    fs.appendFileSync(
+      getAutoresearchRootFilePath(cwd, "resultsLog"),
+      `${JSON.stringify({
+        run: 1,
+        commit: "abc1234",
+        metric: 120,
+        metrics: {},
+        status: "keep",
+        baseline: true,
+        description: "baseline",
+        timestamp: 1700000000000,
+        segment: 0,
+      })}\n`,
+    );
+
+    const result = await initExperiment(cwd, {
+      name: "Parser optimization v2",
+      metric_name: "total_ms",
+      metric_unit: "ms",
+      direction: "lower",
+    });
+
+    expect(result.details).toMatchObject({
+      status: "error",
+      phase: "reset_required",
+    });
+    expect((result.content[0] as { text: string }).text).toContain("reset: true");
+  });
+
   it("appends a new config header on re-init instead of overwriting prior history", async () => {
     const cwd = createTempDir("autoresearch-reinit-");
 
@@ -156,6 +196,7 @@ describe("experiment lifecycle tools", () => {
         metric: 120,
         metrics: {},
         status: "keep",
+        baseline: true,
         description: "baseline",
         timestamp: 1700000000000,
         segment: 0,
@@ -167,6 +208,7 @@ describe("experiment lifecycle tools", () => {
       metric_name: "total_ms",
       metric_unit: "ms",
       direction: "lower",
+      reset: true,
     });
 
     expect(result.content[0]?.type).toBe("text");
@@ -185,6 +227,7 @@ describe("experiment lifecycle tools", () => {
         metric: 120,
         metrics: {},
         status: "keep",
+        baseline: true,
         description: "baseline",
         timestamp: 1700000000000,
         segment: 0,
@@ -204,6 +247,9 @@ describe("experiment lifecycle tools", () => {
         currentRunCount: 0,
       },
     });
+    expect(fs.readFileSync(path.join(cwd, "autoresearch.checkpoint.json"), "utf8")).toContain(
+      '"carryForwardContext"',
+    );
   });
 
   it("reports a successful run and emits a running update", async () => {
@@ -311,6 +357,7 @@ describe("experiment lifecycle tools", () => {
       metric: 120,
       status: "discard",
       description: "baseline",
+      idea: "baseline is noisy; retry with warm cache isolation",
       metrics: {
         compile_ms: 15,
       },
@@ -326,8 +373,10 @@ describe("experiment lifecycle tools", () => {
         compile_ms: 15,
       },
       status: "discard",
+      baseline: true,
       description: "baseline",
       segment: 0,
+      confidence: null,
     });
     expect(result.details).toMatchObject({
       status: "ok",
@@ -346,7 +395,13 @@ describe("experiment lifecycle tools", () => {
       },
     });
     expect((result.content[0] as { text: string }).text).toContain(
+      "This run established the baseline for the current segment.",
+    );
+    expect((result.content[0] as { text: string }).text).toContain(
       "Git: skipped commit (discard) - revert tracked changes yourself with git checkout -- .",
+    );
+    expect(fs.readFileSync(path.join(cwd, "autoresearch.ideas.md"), "utf8")).toContain(
+      "baseline is noisy; retry with warm cache isolation",
     );
   });
 
@@ -358,6 +413,7 @@ describe("experiment lifecycle tools", () => {
       metric: 120,
       status: "discard",
       description: "baseline",
+      idea: "record compile_ms on every run before comparing changes",
       metrics: {
         compile_ms: 15,
       },
@@ -369,6 +425,7 @@ describe("experiment lifecycle tools", () => {
       metric: 110,
       status: "discard",
       description: "missing secondary metric",
+      idea: "keep compile_ms in the log for comparability",
       metrics: {},
     });
 
@@ -385,6 +442,7 @@ describe("experiment lifecycle tools", () => {
       metric: 110,
       status: "discard",
       description: "add bundle size",
+      idea: "bundle_kb looks useful enough to track on future runs",
       metrics: {
         compile_ms: 12,
         bundle_kb: 7,
@@ -404,6 +462,7 @@ describe("experiment lifecycle tools", () => {
       metric: 110,
       status: "discard",
       description: "add bundle size",
+      idea: "bundle_kb looks useful enough to track on future runs",
       metrics: {
         compile_ms: 12,
         bundle_kb: 7,
@@ -464,6 +523,7 @@ describe("experiment lifecycle tools", () => {
       metric: 130,
       status: "discard",
       description: "discard regression",
+      idea: "regression suggests parser cache invalidation is too broad",
     });
 
     expect(discardResult.details).toMatchObject({
@@ -508,6 +568,56 @@ describe("experiment lifecycle tools", () => {
     expect(statuses).toEqual(["keep", "discard", "crash"]);
   });
 
+  it("computes and persists the upstream-style confidence score after enough runs", async () => {
+    const cwd = createTempDir("autoresearch-confidence-");
+    await seedExperiment(cwd);
+
+    await logExperiment(cwd, {
+      commit: "abc1234",
+      metric: 100,
+      status: "keep",
+      description: "baseline",
+    });
+    await logExperiment(cwd, {
+      commit: "def5678",
+      metric: 99,
+      status: "discard",
+      description: "noise sample",
+      idea: "rerun without the optimization to confirm the noise floor",
+    });
+
+    const result = await logExperiment(cwd, {
+      commit: "fedcba9",
+      metric: 95,
+      status: "keep",
+      description: "confirmed improvement",
+    });
+
+    expect(result.details).toMatchObject({
+      status: "ok",
+      experiment: {
+        confidence: 5,
+      },
+      state: {
+        confidence: 5,
+      },
+    });
+    expect((result.content[0] as { text: string }).text).toContain(
+      "Confidence: 5.0x noise floor - improvement is likely real",
+    );
+
+    const rows = readJsonl(cwd).filter((entry) => entry.type !== "config");
+    expect(rows[2]).toMatchObject({
+      confidence: 5,
+    });
+    expect(fs.readFileSync(path.join(cwd, "autoresearch.checkpoint.json"), "utf8")).toContain(
+      '"confidence": 5',
+    );
+    expect(fs.readFileSync(path.join(cwd, "autoresearch.md"), "utf8")).toContain(
+      "Confidence: 5.0x noise floor - improvement is likely real",
+    );
+  });
+
   it("keeps the experiment window open across run_experiment and surfaces queued steers in log_experiment", async () => {
     const cwd = createTempDir("autoresearch-queued-steers-");
     await seedExperiment(cwd);
@@ -528,6 +638,7 @@ describe("experiment lifecycle tools", () => {
       metric: 120,
       status: "discard",
       description: "baseline",
+      idea: "parser cache might still help if keyed on file contents",
     });
 
     expect((result.content[0] as { text: string }).text).toContain(
@@ -581,6 +692,7 @@ describe("experiment lifecycle tools", () => {
     const result = await logExperiment(cwd, {
       status: "discard",
       description: "baseline",
+      idea: "compile_ms should stay in the log for future comparisons",
     });
 
     expect(result.details).toMatchObject({
