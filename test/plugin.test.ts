@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import plugin from "../index.js";
 import { runCommandWithTimeout } from "./helpers/fake-runtime.js";
 
+vi.mock("openclaw/plugin-sdk/core", () => ({
+  definePluginEntry: <TEntry extends { id: string; name: string; description: string }>(entry: TEntry) =>
+    entry,
+}));
+
 describe("plugin registration", () => {
-  it("registers the command, OpenClaw hooks, and all tool surfaces", () => {
+  it("registers the command, OpenClaw hooks, and all tool surfaces", async () => {
+    const plugin = (await import("../index.js")).default;
     const api = {
       resolvePath: vi.fn(() => "/tmp/repo"),
       runtime: {
@@ -16,7 +21,7 @@ describe("plugin registration", () => {
       on: vi.fn(),
     };
 
-    plugin.register(api);
+    plugin.register(api as never);
 
     expect(api.registerCommand).toHaveBeenCalledTimes(1);
     expect(api.on).toHaveBeenCalledTimes(5);
@@ -28,6 +33,12 @@ describe("plugin registration", () => {
       "session_end",
     ]);
     expect(api.registerTool).toHaveBeenCalledTimes(4);
+    expect(api.registerTool.mock.calls.map(([, options]) => options)).toEqual([
+      { name: "init_experiment", optional: false },
+      { name: "run_experiment", optional: false },
+      { name: "log_experiment", optional: false },
+      { name: "autoresearch_status", optional: false },
+    ]);
     expect(
       api.registerTool.mock.calls.map(([tool]) =>
         typeof tool === "function"

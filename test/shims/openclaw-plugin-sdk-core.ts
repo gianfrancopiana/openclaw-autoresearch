@@ -22,6 +22,8 @@ export type ToolRegistration = {
   name: string;
 };
 
+export type AnyAgentTool = ToolRegistration;
+
 export type OpenClawPluginApi = {
   resolvePath(path: string): string;
   runtime: {
@@ -50,7 +52,10 @@ export type OpenClawPluginApi = {
       }>;
     };
   };
-  registerTool(tool: ToolRegistration | ((ctx: OpenClawPluginToolContext) => ToolRegistration)): void;
+  registerTool(
+    tool: ToolRegistration | ((ctx: OpenClawPluginToolContext) => ToolRegistration),
+    options?: { name?: string; optional?: boolean },
+  ): void;
   registerCommand(command: CommandRegistration): void;
   on?(
     hookName: string,
@@ -79,6 +84,15 @@ export type OpenClawPluginApi = {
     ) => { systemPrompt?: string } | void,
   ): void;
 };
+
+export function definePluginEntry<TEntry extends {
+  id: string;
+  name: string;
+  description: string;
+  register(api: OpenClawPluginApi): void;
+}>(entry: TEntry): TEntry {
+  return entry;
+}
 
 export function emptyPluginConfigSchema(): Record<string, never> {
   return {};

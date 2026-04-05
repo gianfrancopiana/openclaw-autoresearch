@@ -10,6 +10,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "openclaw/plugin-sdk": shimPath,
+      "openclaw/plugin-sdk/core": shimPath,
+      "openclaw/plugin-sdk/plugin-entry": shimPath,
     },
   },
   test: {

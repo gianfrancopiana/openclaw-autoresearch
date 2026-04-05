@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import {
   AUTORESEARCH_ROOT_FILES,
   getAutoresearchRootFilePath,

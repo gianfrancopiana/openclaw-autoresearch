@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { OpenClawPluginToolContext } from "openclaw/plugin-sdk";
+import type { OpenClawPluginToolContext } from "openclaw/plugin-sdk/core";
 import { type ResolvedAutoresearchScope, resolveAutoresearchScope } from "../scope.js";
 
 export type ResolvedToolExecutionScope = Omit<ResolvedAutoresearchScope, "repoDir"> & {

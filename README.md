@@ -34,6 +34,7 @@ The design is file-first: any agent can pick up the repo-root files and continue
 ## Install
 
 Requires OpenClaw `2026.3.13` or newer.
+Needs bash, git, and a git repo.
 
 Use OpenClaw's plugin installer:
 
