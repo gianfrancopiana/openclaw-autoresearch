@@ -32,6 +32,14 @@ function createApi(cwd: string) {
   };
 }
 
+function createToolContext(cwd: string, sessionKey = cwd) {
+  return {
+    workspaceDir: cwd,
+    sessionKey,
+    sessionId: sessionKey + ":session",
+  };
+}
+
 function readJsonl(cwd: string): Array<Record<string, unknown>> {
   const jsonlPath = getAutoresearchRootFilePath(cwd, "resultsLog");
   return fs
@@ -52,7 +60,7 @@ async function initExperiment(
     reset?: boolean;
   },
 ) {
-  return await createInitExperimentTool(createApi(cwd) as never).execute(
+  return await createInitExperimentTool(createApi(cwd) as never, createToolContext(cwd)).execute(
     "tool-call",
     params,
     createAbortSignal(),
@@ -68,7 +76,7 @@ async function runExperiment(
   },
   onUpdate?: (update: unknown) => void | Promise<void>,
 ) {
-  return await createRunExperimentTool(createApi(cwd) as never).execute(
+  return await createRunExperimentTool(createApi(cwd) as never, createToolContext(cwd)).execute(
     "tool-call",
     params,
     createAbortSignal(),
@@ -88,7 +96,7 @@ async function logExperiment(
     force?: boolean;
   },
 ) {
-  return await createLogExperimentTool(createApi(cwd) as never).execute(
+  return await createLogExperimentTool(createApi(cwd) as never, createToolContext(cwd)).execute(
     "tool-call",
     params,
     createAbortSignal(),
@@ -626,12 +634,13 @@ describe("experiment lifecycle tools", () => {
       command: "printf 'baseline\\n'",
     });
 
-    expect(getAutoresearchRuntimeState(cwd)).toMatchObject({
+    const scope = createToolContext(cwd);
+    expect(getAutoresearchRuntimeState(scope)).toMatchObject({
       runInFlight: true,
     });
 
-    queueAutoresearchSteer(cwd, "try a parser cache");
-    queueAutoresearchSteer(cwd, "watch compile_ms too");
+    queueAutoresearchSteer(scope, "try a parser cache");
+    queueAutoresearchSteer(scope, "watch compile_ms too");
 
     const result = await logExperiment(cwd, {
       commit: "abc1234",
@@ -646,7 +655,7 @@ describe("experiment lifecycle tools", () => {
     );
     expect((result.content[0] as { text: string }).text).toContain("- try a parser cache");
     expect((result.content[0] as { text: string }).text).toContain("- watch compile_ms too");
-    expect(getAutoresearchRuntimeState(cwd)).toMatchObject({
+    expect(getAutoresearchRuntimeState(scope)).toMatchObject({
       runInFlight: false,
       queuedSteers: [],
       pendingRun: null,
@@ -707,7 +716,7 @@ describe("experiment lifecycle tools", () => {
     expect((result.content[0] as { text: string }).text).toContain(
       "Used the pending run_experiment result as the source of truth",
     );
-    expect(getAutoresearchRuntimeState(cwd)).toMatchObject({
+    expect(getAutoresearchRuntimeState(createToolContext(cwd))).toMatchObject({
       pendingRun: null,
       runInFlight: false,
     });

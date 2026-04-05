@@ -24,11 +24,19 @@ function createApi(cwd: string) {
   };
 }
 
+function createToolContext(cwd: string, sessionKey = cwd) {
+  return {
+    workspaceDir: cwd,
+    sessionKey,
+    sessionId: `${sessionKey}:session`,
+  };
+}
+
 describe("autoresearch tools", () => {
-  it("init_experiment resolves cwd from api.resolvePath instead of expecting a fifth execute arg", async () => {
+  it("init_experiment binds repo cwd from the OpenClaw tool workspace instead of api.resolvePath", async () => {
     const cwd = createTempDir();
     const api = createApi(cwd);
-    const tool = createInitExperimentTool(api as never);
+    const tool = createInitExperimentTool(api as never, createToolContext(cwd));
 
     const result = await tool.execute(
       "call-1",
@@ -42,15 +50,16 @@ describe("autoresearch tools", () => {
       undefined,
     );
 
-    expect(api.resolvePath).toHaveBeenCalledWith(".");
+    expect(api.resolvePath).not.toHaveBeenCalled();
     expect(result.details).toMatchObject({ status: "ok" });
     expect(fs.existsSync(path.join(cwd, AUTORESEARCH_ROOT_FILES.resultsLog))).toBe(true);
   });
 
-  it("autoresearch_status resolves cwd from api.resolvePath", async () => {
+  it("autoresearch_status reads the active workspace from the OpenClaw tool context", async () => {
     const cwd = createTempDir();
     const api = createApi(cwd);
-    await createInitExperimentTool(api as never).execute(
+    const toolContext = createToolContext(cwd);
+    await createInitExperimentTool(api as never, toolContext).execute(
       "call-1",
       {
         name: "Repo robustness",
@@ -62,24 +71,24 @@ describe("autoresearch tools", () => {
       undefined,
     );
 
-    const result = await createAutoresearchStatusTool(api as never).execute(
+    const result = await createAutoresearchStatusTool(api as never, toolContext).execute(
       "call-2",
       {},
       new AbortController().signal,
       undefined,
     );
 
-    expect(api.resolvePath).toHaveBeenCalledWith(".");
+    expect(api.resolvePath).not.toHaveBeenCalled();
     expect(result.content[0]?.text).toContain("Session: Repo robustness");
     expect(result.content[0]?.text).toContain("Metric: escaped_mutations");
   });
 
-  it("run_experiment resolves cwd from api.resolvePath", async () => {
+  it("run_experiment reuses the OpenClaw tool workspace when no cwd override is supplied", async () => {
     const cwd = createTempDir();
     const api = createApi(cwd);
     const updates: unknown[] = [];
 
-    const result = await createRunExperimentTool(api as never).execute(
+    const result = await createRunExperimentTool(api as never, createToolContext(cwd)).execute(
       "call-3",
       { command: "node -e \"console.log('ok')\"", timeout_seconds: 10 },
       new AbortController().signal,
@@ -88,15 +97,16 @@ describe("autoresearch tools", () => {
       },
     );
 
-    expect(api.resolvePath).toHaveBeenCalledWith(".");
+    expect(api.resolvePath).not.toHaveBeenCalled();
     expect(updates.length).toBe(1);
     expect(result.details).toMatchObject({ passed: true, timedOut: false });
   });
 
-  it("log_experiment resolves cwd from api.resolvePath", async () => {
+  it("log_experiment reuses the OpenClaw tool workspace when no cwd override is supplied", async () => {
     const cwd = createTempDir();
     const api = createApi(cwd);
-    await createInitExperimentTool(api as never).execute(
+    const toolContext = createToolContext(cwd);
+    await createInitExperimentTool(api as never, toolContext).execute(
       "call-1",
       {
         name: "Repo robustness",
@@ -108,7 +118,7 @@ describe("autoresearch tools", () => {
       undefined,
     );
 
-    const result = await createLogExperimentTool(api as never).execute(
+    const result = await createLogExperimentTool(api as never, toolContext).execute(
       "call-4",
       {
         commit: "abc1234",
@@ -121,17 +131,18 @@ describe("autoresearch tools", () => {
       undefined,
     );
 
-    expect(api.resolvePath).toHaveBeenCalledWith(".");
+    expect(api.resolvePath).not.toHaveBeenCalled();
     expect(result.details).toMatchObject({ status: "ok" });
-    expect(result.content[0]?.text).toContain("Logged #1: baseline - baseline");
+    expect(result.content[0]?.text).toContain("Logged #1: discard - baseline");
   });
 
   it("supports explicit cwd overrides for nested repo tool execution", async () => {
     const workspaceCwd = createTempDir();
     const repoCwd = createTempDir();
     const api = createApi(workspaceCwd);
+    const toolContext = createToolContext(workspaceCwd, "session:nested");
 
-    const initResult = await createInitExperimentTool(api as never).execute(
+    const initResult = await createInitExperimentTool(api as never, toolContext).execute(
       "call-1",
       {
         cwd: repoCwd,
@@ -149,7 +160,7 @@ describe("autoresearch tools", () => {
     expect(fs.existsSync(path.join(repoCwd, AUTORESEARCH_ROOT_FILES.resultsLog))).toBe(true);
     expect(fs.existsSync(path.join(workspaceCwd, AUTORESEARCH_ROOT_FILES.resultsLog))).toBe(false);
 
-    const runResult = await createRunExperimentTool(api as never).execute(
+    const runResult = await createRunExperimentTool(api as never, toolContext).execute(
       "call-2",
       {
         cwd: repoCwd,
@@ -163,7 +174,7 @@ describe("autoresearch tools", () => {
     expect(runResult.details).toMatchObject({ passed: true, timedOut: false });
     expect((runResult.details as { stdout: string }).stdout.trim()).toBe(repoCwd);
 
-    const statusResult = await createAutoresearchStatusTool(api as never).execute(
+    const statusResult = await createAutoresearchStatusTool(api as never, toolContext).execute(
       "call-3",
       { cwd: repoCwd },
       new AbortController().signal,
@@ -172,7 +183,7 @@ describe("autoresearch tools", () => {
 
     expect(statusResult.content[0]?.text).toContain("Session: Nested repo robustness");
 
-    const logResult = await createLogExperimentTool(api as never).execute(
+    const logResult = await createLogExperimentTool(api as never, toolContext).execute(
       "call-4",
       {
         cwd: repoCwd,
@@ -187,6 +198,6 @@ describe("autoresearch tools", () => {
     );
 
     expect(logResult.details).toMatchObject({ status: "ok" });
-    expect(logResult.content[0]?.text).toContain("Logged #1: baseline - baseline");
+    expect(logResult.content[0]?.text).toContain("Logged #1: discard - baseline");
   });
 });

@@ -8,10 +8,9 @@ import {
 import { reconstructStateFromJsonl } from "../state.js";
 import { formatAutoresearchStatusText } from "../tools/autoresearch-status.js";
 import {
-  clearAutoresearchSteers,
+  clearAutoresearchRuntimeState,
   getAutoresearchRuntimeState,
   setAutoresearchPendingCommand,
-  setAutoresearchRunInFlight,
   setAutoresearchRuntimeMode,
 } from "../runtime-state.js";
 import {
@@ -19,11 +18,16 @@ import {
   getAutoresearchSessionLockStatus,
   removeAutoresearchSessionLock,
 } from "../session-lock.js";
+import { type AutoresearchScopeRef, resolveAutoresearchScope } from "../scope.js";
 
 type CommandContext = {
   args?: string;
   channel?: string;
   senderId?: string;
+  sessionKey?: string;
+  sessionId?: string;
+  workspaceDir?: string;
+  runId?: string;
   cwd?: string;
 };
 
@@ -45,7 +49,7 @@ export function registerAutoresearchCommand(api: OpenClawPluginApi): void {
     description: "Enable, disable, or inspect repo-root autoresearch mode.",
     acceptsArgs: true,
     handler: (ctx: CommandContext) => {
-      const cwd = resolveCommandCwd(api, ctx);
+      const scope = resolveCommandScope(ctx);
       const rawArgs = (ctx.args ?? "").trim();
       const [verb, ...rest] = rawArgs.split(/\s+/).filter(Boolean);
       const action = (verb ?? "").toLowerCase();
@@ -53,18 +57,19 @@ export function registerAutoresearchCommand(api: OpenClawPluginApi): void {
 
       if (!rawArgs || action === "resume" || action === "on") {
         return {
-          text: enableAutoresearchMode(cwd, rawArgs && action !== "resume" && action !== "on" ? rawArgs : remainder),
+          text: enableAutoresearchMode(
+            scope,
+            rawArgs && action !== "resume" && action !== "on" ? rawArgs : remainder,
+          ),
         };
       }
       if (action === "setup") {
-        return { text: primeAutoresearchSetup(cwd, remainder) };
+        return { text: primeAutoresearchSetup(scope, remainder) };
       }
       if (action === "off") {
-        setAutoresearchRuntimeMode(cwd, "off");
-        setAutoresearchPendingCommand(cwd, null);
-        clearAutoresearchSteers(cwd);
-        setAutoresearchRunInFlight(cwd, false);
-        removeAutoresearchSessionLock(cwd);
+        clearAutoresearchRuntimeState(scope);
+        setAutoresearchRuntimeMode(scope, "off");
+        removeAutoresearchSessionLock(scope);
         return {
           text: [
             "Autoresearch mode OFF.",
@@ -73,30 +78,35 @@ export function registerAutoresearchCommand(api: OpenClawPluginApi): void {
         };
       }
       if (action === "status") {
-        return { text: buildAutoresearchCommandText(cwd, "status") };
+        return { text: buildAutoresearchCommandText(scope, "status") };
       }
       if (action === "help") {
-        return { text: `${COMMAND_USAGE}\n\n${buildAutoresearchCommandText(cwd, "default")}` };
+        return { text: `${COMMAND_USAGE}\n\n${buildAutoresearchCommandText(scope, "default")}` };
       }
 
       return {
-        text: enableAutoresearchMode(cwd, rawArgs),
+        text: enableAutoresearchMode(scope, rawArgs),
       };
     },
   });
 }
 
 export function buildAutoresearchCommandText(
-  cwd: string,
+  scopeRef: AutoresearchScopeRef,
   mode: "default" | "status",
 ): string {
-  const runtimeState = getAutoresearchRuntimeState(cwd);
-  const presentFiles = getPresentCanonicalFiles(cwd);
+  const scope = resolveAutoresearchScope(scopeRef);
+  const runtimeState = getAutoresearchRuntimeState(scopeRef);
+  if (!scope.repoDir) {
+    return buildWorkspacePendingCommandText(runtimeState);
+  }
+
+  const presentFiles = getPresentCanonicalFiles(scope.repoDir);
   const presentSessionFiles = presentFiles.filter(
     (file) => file !== AUTORESEARCH_ROOT_FILES.sessionLock,
   );
   const hasSession = presentSessionFiles.length > 0;
-  const lockStatus = getAutoresearchSessionLockStatus(cwd);
+  const lockStatus = getAutoresearchSessionLockStatus(scope);
 
   if (!hasSession) {
     return [
@@ -109,14 +119,18 @@ export function buildAutoresearchCommandText(
     ].join("\n");
   }
 
-  const state = reconstructStateFromJsonl(cwd);
+  const state = reconstructStateFromJsonl(scope.repoDir);
   const lines = [
     `Autoresearch session detected at repo root: ${presentFiles.join(", ")}`,
     `Read \`${AUTORESEARCH_ROOT_FILES.sessionDoc}\` before resuming or changing the loop.`,
   ];
 
   if (mode === "status") {
-    lines.push("", formatAutoresearchStatusText(state, runtimeState), `Session lock: ${formatLockStatus(lockStatus)}`);
+    lines.push(
+      "",
+      formatAutoresearchStatusText(state, runtimeState),
+      `Session lock: ${formatLockStatus(lockStatus)}`,
+    );
   } else if (state.mode === "active" || state.hasSessionDoc) {
     lines.push(
       "Use `/autoresearch` or `/autoresearch on` to enable mode for the next agent turn, then continue the upstream loop with `init_experiment`, `run_experiment`, and `log_experiment` as needed.",
@@ -130,25 +144,47 @@ export function buildAutoresearchCommandText(
   return lines.join("\n");
 }
 
-function enableAutoresearchMode(cwd: string, args: string | null): string {
-  const lockStatus = acquireAutoresearchSessionLock(cwd);
-  if (lockStatus.state === "active" && !lockStatus.ownedByCurrentProcess) {
+function buildWorkspacePendingCommandText(
+  runtimeState: ReturnType<typeof getAutoresearchRuntimeState>,
+): string {
+  return [
+    "OpenClaw has not exposed a workspace root for this session yet.",
+    "Send a normal message from the target workspace, or invoke an autoresearch tool there, so the plugin can bind `workspaceDir` and inspect the repo-root files.",
+    `Runtime mode: ${runtimeState.mode}`,
+    `Pending run: ${runtimeState.pendingRun ? "yes" : "no"}`,
+  ].join("\n");
+}
+
+function enableAutoresearchMode(scopeRef: AutoresearchScopeRef, args: string | null): string {
+  const scope = resolveAutoresearchScope(scopeRef);
+  if (scope.repoDir) {
+    const lockStatus = acquireAutoresearchSessionLock(scope);
+    if (lockStatus.state === "active" && !lockStatus.ownedByCurrentSession) {
+      return [
+        "Autoresearch mode NOT enabled.",
+        `Another live autoresearch loop holds autoresearch.lock (PID ${lockStatus.pid}, started ${new Date(lockStatus.timestamp ?? 0).toISOString()}).`,
+        "Resume that loop instead of creating a parallel session.",
+      ].join("\n");
+    }
+  }
+
+  setAutoresearchRuntimeMode(scopeRef, "on");
+  const presentFiles = scope.repoDir ? getPresentCanonicalFiles(scope.repoDir) : [];
+  const hasSession = presentFiles.some((file) => file !== AUTORESEARCH_ROOT_FILES.sessionLock);
+  setAutoresearchPendingCommand(scopeRef, {
+    kind: hasSession ? "resume" : "setup",
+    args,
+  });
+
+  if (!scope.repoDir) {
     return [
-      "Autoresearch mode NOT enabled.",
-      `Another live autoresearch loop holds autoresearch.lock (PID ${lockStatus.pid}, started ${new Date(lockStatus.timestamp ?? 0).toISOString()}).`,
-      "Resume that loop instead of creating a parallel session.",
+      "Autoresearch mode ON.",
+      "Workspace root is not bound yet, so the next agent or tool turn for this session will resolve it from OpenClaw `workspaceDir` before continuing.",
+      args ? `Captured instruction: ${args}` : "Send a normal message to continue once the workspace is available.",
     ].join("\n");
   }
 
-  setAutoresearchRuntimeMode(cwd, "on");
-  const presentFiles = getPresentCanonicalFiles(cwd);
-  const hasSession = presentFiles.some((file) => file !== AUTORESEARCH_ROOT_FILES.sessionLock);
-
   if (!hasSession) {
-    setAutoresearchPendingCommand(cwd, {
-      kind: "setup",
-      args,
-    });
     return [
       "Autoresearch mode ON.",
       "No repo-root session was detected, so the next agent turn will be primed for setup.",
@@ -158,10 +194,6 @@ function enableAutoresearchMode(cwd: string, args: string | null): string {
     ].join("\n");
   }
 
-  setAutoresearchPendingCommand(cwd, {
-    kind: "resume",
-    args,
-  });
   return [
     "Autoresearch mode ON.",
     `Next agent turn will be primed from \`${AUTORESEARCH_ROOT_FILES.sessionDoc}\` and the canonical repo-root files.`,
@@ -169,35 +201,43 @@ function enableAutoresearchMode(cwd: string, args: string | null): string {
   ].join("\n");
 }
 
-function primeAutoresearchSetup(cwd: string, args: string | null): string {
-  const lockStatus = acquireAutoresearchSessionLock(cwd);
-  if (lockStatus.state === "active" && !lockStatus.ownedByCurrentProcess) {
-    return [
-      "Autoresearch setup NOT primed.",
-      `Another live autoresearch loop holds autoresearch.lock (PID ${lockStatus.pid}, started ${new Date(lockStatus.timestamp ?? 0).toISOString()}).`,
-      "Resume that loop instead of starting a parallel setup flow.",
-    ].join("\n");
+function primeAutoresearchSetup(scopeRef: AutoresearchScopeRef, args: string | null): string {
+  const scope = resolveAutoresearchScope(scopeRef);
+  if (scope.repoDir) {
+    const lockStatus = acquireAutoresearchSessionLock(scope);
+    if (lockStatus.state === "active" && !lockStatus.ownedByCurrentSession) {
+      return [
+        "Autoresearch setup NOT primed.",
+        `Another live autoresearch loop holds autoresearch.lock (PID ${lockStatus.pid}, started ${new Date(lockStatus.timestamp ?? 0).toISOString()}).`,
+        "Resume that loop instead of starting a parallel setup flow.",
+      ].join("\n");
+    }
   }
 
-  setAutoresearchRuntimeMode(cwd, "on");
-  setAutoresearchPendingCommand(cwd, {
+  setAutoresearchRuntimeMode(scopeRef, "on");
+  setAutoresearchPendingCommand(scopeRef, {
     kind: "setup",
     args,
   });
 
   return [
     "Autoresearch setup primed.",
-    "The next agent turn will be told to create the canonical repo-root files and start the loop.",
+    scope.repoDir
+      ? "The next agent turn will be told to create the canonical repo-root files and start the loop."
+      : "The next agent turn will wait for OpenClaw to provide a workspace root, then create the canonical repo-root files and start the loop.",
     "Continue with a normal message on the next turn, or invoke the skill directly with `/skill autoresearch-create`.",
     args ? `Captured setup instruction: ${args}` : "Add an argument to `/autoresearch setup` if you want a specific goal or constraint carried forward.",
   ].join("\n");
 }
 
-function resolveCommandCwd(api: OpenClawPluginApi, ctx: CommandContext): string {
-  if (typeof ctx.cwd === "string" && ctx.cwd.trim().length > 0) {
-    return ctx.cwd;
-  }
-  return api.resolvePath(".");
+function resolveCommandScope(ctx: CommandContext): AutoresearchScopeRef {
+  return {
+    sessionKey: ctx.sessionKey,
+    sessionId: ctx.sessionId,
+    workspaceDir: ctx.workspaceDir,
+    runId: ctx.runId,
+    legacyCwd: ctx.cwd,
+  };
 }
 
 function getPresentCanonicalFiles(cwd: string): string[] {

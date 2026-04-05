@@ -12,6 +12,11 @@ import {
   setAutoresearchContinuationReminder,
 } from "./runtime-state.js";
 import { removeAutoresearchSessionLock } from "./session-lock.js";
+import {
+  forgetAutoresearchScope,
+  type AutoresearchScopeRef,
+  resolveAutoresearchScope,
+} from "./scope.js";
 
 type BeforeAgentStartEvent = {
   systemPrompt?: string;
@@ -19,6 +24,10 @@ type BeforeAgentStartEvent = {
 
 type HookContext = {
   cwd?: string;
+  workspaceDir?: string;
+  sessionKey?: string;
+  sessionId?: string;
+  runId?: string;
 };
 
 type HookCapablePluginApi = OpenClawPluginApi & {
@@ -33,12 +42,7 @@ export function registerAutoresearchHooks(api: OpenClawPluginApi): void {
   const hookApi = api as HookCapablePluginApi;
   if (typeof hookApi.on === "function") {
     hookApi.on("before_prompt_build", (_event, ctx) => {
-      const cwd = resolveHookCwd(api, ctx);
-      if (cwd === null) {
-        return;
-      }
-
-      const addition = buildBeforePromptBuildContext(cwd);
+      const addition = buildBeforePromptBuildContext(resolveHookScope(ctx));
       if (addition === null) {
         return;
       }
@@ -49,12 +53,8 @@ export function registerAutoresearchHooks(api: OpenClawPluginApi): void {
     });
 
     hookApi.on("message_received", (event, ctx) => {
-      const cwd = resolveHookCwd(api, ctx);
-      if (cwd === null) {
-        return;
-      }
-
-      const state = getAutoresearchRuntimeState(cwd);
+      const scope = resolveHookScope(ctx);
+      const state = getAutoresearchRuntimeState(scope);
       if (!state.runInFlight) {
         return;
       }
@@ -64,12 +64,12 @@ export function registerAutoresearchHooks(api: OpenClawPluginApi): void {
         return;
       }
 
-      queueAutoresearchSteer(cwd, messageText);
+      queueAutoresearchSteer(scope, messageText);
     });
 
     hookApi.on("before_tool_call", (event, ctx) => {
-      const cwd = resolveHookCwd(api, ctx);
-      if (cwd === null || !shouldEnforceAutoresearchMode(cwd)) {
+      const scope = resolveHookScope(ctx);
+      if (!shouldEnforceAutoresearchMode(scope)) {
         return;
       }
 
@@ -92,25 +92,22 @@ export function registerAutoresearchHooks(api: OpenClawPluginApi): void {
     });
 
     hookApi.on("agent_end", (_event, ctx) => {
-      const cwd = resolveHookCwd(api, ctx);
-      if (cwd === null) {
+      const scope = resolveAutoresearchScope(resolveHookScope(ctx));
+      if (!scope.repoDir) {
         return;
       }
 
-      const state = reconstructStateFromJsonl(cwd);
+      const state = reconstructStateFromJsonl(scope.repoDir);
       if (state.mode === "active" && state.ideas.hasBacklog) {
-        setAutoresearchContinuationReminder(cwd, true);
+        setAutoresearchContinuationReminder(resolveHookScope(ctx), true);
       }
     });
 
     hookApi.on("session_end", (_event, ctx) => {
-      const cwd = resolveHookCwd(api, ctx);
-      if (cwd === null) {
-        return;
-      }
-
-      removeAutoresearchSessionLock(cwd);
-      clearAutoresearchRuntimeState(cwd);
+      const scope = resolveHookScope(ctx);
+      removeAutoresearchSessionLock(scope);
+      clearAutoresearchRuntimeState(scope);
+      forgetAutoresearchScope(scope);
     });
     return;
   }
@@ -120,12 +117,7 @@ export function registerAutoresearchHooks(api: OpenClawPluginApi): void {
   }
 
   hookApi.registerHook("before_agent_start", (event, ctx) => {
-    const cwd = resolveHookCwd(api, ctx);
-    if (cwd === null) {
-      return;
-    }
-
-    const addition = buildBeforePromptBuildContext(cwd);
+    const addition = buildBeforePromptBuildContext(resolveHookScope(ctx));
     if (addition === null) {
       return;
     }
@@ -137,11 +129,16 @@ export function registerAutoresearchHooks(api: OpenClawPluginApi): void {
   });
 }
 
-export function buildBeforePromptBuildContext(cwd: string): string | null {
-  const state = reconstructStateFromJsonl(cwd);
-  const runtimeState = getAutoresearchRuntimeState(cwd);
-  const checkpoint = readAutoresearchCheckpoint(cwd);
-  if (!shouldEnforceAutoresearchMode(cwd, state, runtimeState)) {
+export function buildBeforePromptBuildContext(scopeRef: AutoresearchScopeRef): string | null {
+  const scope = resolveAutoresearchScope(scopeRef);
+  if (!scope.repoDir) {
+    return null;
+  }
+
+  const state = reconstructStateFromJsonl(scope.repoDir);
+  const runtimeState = getAutoresearchRuntimeState(scopeRef);
+  const checkpoint = readAutoresearchCheckpoint(scope.repoDir);
+  if (!shouldEnforceAutoresearchMode(scopeRef, state, runtimeState)) {
     return null;
   }
 
@@ -150,8 +147,8 @@ export function buildBeforePromptBuildContext(cwd: string): string | null {
     AUTORESEARCH_ROOT_FILES.runnerScript,
     AUTORESEARCH_ROOT_FILES.resultsLog,
   ];
-  const pendingCommand = consumeAutoresearchPendingCommand(cwd);
-  const needsContinuationReminder = consumeAutoresearchContinuationReminder(cwd);
+  const pendingCommand = consumeAutoresearchPendingCommand(scopeRef);
+  const needsContinuationReminder = consumeAutoresearchContinuationReminder(scopeRef);
 
   const lines = ["", "", "## Autoresearch Mode (ACTIVE)"];
 
@@ -195,7 +192,7 @@ export function buildBeforePromptBuildContext(cwd: string): string | null {
   }
 
   lines.push(
-    `For discard or crash results, log_experiment records the outcome but does not revert your tree for you. Run \`git checkout -- .\` yourself after logging when you want to discard tracked changes.`,
+    "For discard or crash results, log_experiment records the outcome but does not revert your tree for you. Run `git checkout -- .` yourself after logging when you want to discard tracked changes.",
   );
 
   if (state.ideas.hasBacklog) {
@@ -219,17 +216,14 @@ export function buildBeforePromptBuildContext(cwd: string): string | null {
   return lines.join("\n");
 }
 
-function resolveHookCwd(api: OpenClawPluginApi, ctx: HookContext | undefined): string | null {
-  if (ctx && typeof ctx.cwd === "string" && ctx.cwd.trim().length > 0) {
-    return ctx.cwd;
-  }
-
-  try {
-    const resolved = api.resolvePath(".");
-    return resolved.trim().length > 0 ? resolved : null;
-  } catch {
-    return null;
-  }
+function resolveHookScope(ctx: HookContext | undefined): Exclude<AutoresearchScopeRef, string> {
+  return {
+    sessionKey: ctx?.sessionKey,
+    sessionId: ctx?.sessionId,
+    workspaceDir: ctx?.workspaceDir,
+    runId: ctx?.runId,
+    legacyCwd: ctx?.cwd,
+  };
 }
 
 function extractMessageText(event: unknown): string | null {
@@ -278,15 +272,18 @@ function isCommandLikeMessage(text: string): boolean {
 }
 
 function shouldEnforceAutoresearchMode(
-  cwd: string,
-  state = reconstructStateFromJsonl(cwd),
-  runtimeState = getAutoresearchRuntimeState(cwd),
+  scopeRef: AutoresearchScopeRef,
+  state = (() => {
+    const scope = resolveAutoresearchScope(scopeRef);
+    return scope.repoDir ? reconstructStateFromJsonl(scope.repoDir) : null;
+  })(),
+  runtimeState = getAutoresearchRuntimeState(scopeRef),
 ): boolean {
   return (
     runtimeState.mode === "on" ||
     runtimeState.runInFlight ||
     runtimeState.pendingRun !== null ||
-    (runtimeState.mode !== "off" && (state.mode === "active" || state.hasSessionDoc))
+    (runtimeState.mode !== "off" && Boolean(state && (state.mode === "active" || state.hasSessionDoc)))
   );
 }
 
