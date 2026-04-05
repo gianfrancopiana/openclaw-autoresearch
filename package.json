@@ -49,10 +49,18 @@
   "publishConfig": {
     "access": "public"
   },
-  "openclawRuntime": ">=2026.3.13",
   "openclaw": {
     "extensions": [
       "./index.ts"
-    ]
+    ],
+    "install": {
+      "minHostVersion": ">=2026.3.13"
+    },
+    "compat": {
+      "pluginApi": ">=2026.3.13"
+    },
+    "build": {
+      "openclawVersion": "2026.3.13"
+    }
   }
 }
