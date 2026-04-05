@@ -8,6 +8,9 @@
 ## Release
 
 1. Update `package.json` and `openclaw.plugin.json` if you are changing the version.
+   Keep `package.json#openclaw.install`, `package.json#openclaw.compat`, and
+   `package.json#openclaw.build` aligned if the minimum supported OpenClaw
+   version changes.
 2. Run the release checks:
 
    ```bash
