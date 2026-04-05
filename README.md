@@ -33,7 +33,9 @@ The design is file-first: any agent can pick up the repo-root files and continue
 
 ## Install
 
-Requires OpenClaw `2026.3.13` or newer.
+Requires OpenClaw `2026.3.13` or newer. The package declares that floor in
+`package.json#openclaw.install.minHostVersion`, and publishes current
+OpenClaw compatibility metadata under `openclaw.compat` and `openclaw.build`.
 
 Use OpenClaw's plugin installer:
 
@@ -63,7 +65,11 @@ npm pack
 openclaw plugins install ./gianfrancopiana-openclaw-autoresearch-<version>.tgz
 ```
 
-The install command records the plugin, enables it, and exposes the plugin surfaces on restart. The installer reads `package.json#openclaw.extensions`, loads the root [`index.ts`](index.ts), and discovers the manifest in [`openclaw.plugin.json`](openclaw.plugin.json).
+The install command records the plugin, enables it, and exposes the plugin
+surfaces on restart. The installer reads `package.json#openclaw.extensions`,
+enforces `package.json#openclaw.install.minHostVersion`, loads the root
+[`index.ts`](index.ts), and discovers the manifest in
+[`openclaw.plugin.json`](openclaw.plugin.json).
 
 Verify:
 
