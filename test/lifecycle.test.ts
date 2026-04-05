@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
@@ -14,7 +15,12 @@ import {
 import { runCommandWithTimeout } from "./helpers/fake-runtime.js";
 
 function createTempDir(prefix: string): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const rawCwd = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const cwd = fs.realpathSync(rawCwd);
+  execFileSync("git", ["init", "-b", "main"], { cwd, stdio: "pipe" });
+  execFileSync("git", ["config", "user.name", "Test User"], { cwd, stdio: "pipe" });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd, stdio: "pipe" });
+  return cwd;
 }
 
 function createAbortSignal(): AbortSignal {

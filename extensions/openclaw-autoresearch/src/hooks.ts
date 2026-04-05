@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { AUTORESEARCH_ROOT_FILES } from "./files.js";
 import { reconstructStateFromJsonl } from "./state.js";
 import { readAutoresearchCheckpoint } from "./checkpoint.js";
@@ -30,7 +30,7 @@ type HookContext = {
   runId?: string;
 };
 
-type HookCapablePluginApi = OpenClawPluginApi & {
+type HookCapablePluginApi = {
   on?: (hookName: string, handler: (event: unknown, ctx: HookContext) => unknown) => void;
   registerHook?: (
     hookName: string,
@@ -39,7 +39,7 @@ type HookCapablePluginApi = OpenClawPluginApi & {
 };
 
 export function registerAutoresearchHooks(api: OpenClawPluginApi): void {
-  const hookApi = api as HookCapablePluginApi;
+  const hookApi = api as unknown as HookCapablePluginApi;
   if (typeof hookApi.on === "function") {
     hookApi.on("before_prompt_build", (_event, ctx) => {
       const addition = buildBeforePromptBuildContext(resolveHookScope(ctx));
@@ -116,7 +116,7 @@ export function registerAutoresearchHooks(api: OpenClawPluginApi): void {
     return;
   }
 
-  hookApi.registerHook("before_agent_start", (event, ctx) => {
+  hookApi.registerHook("before_agent_start", (event: BeforeAgentStartEvent, ctx: HookContext) => {
     const addition = buildBeforePromptBuildContext(resolveHookScope(ctx));
     if (addition === null) {
       return;

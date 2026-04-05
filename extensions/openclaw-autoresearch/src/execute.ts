@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 
 const OUTPUT_TAIL_LINES = 80;
 const DEFAULT_TIMEOUT_SECONDS = 600;

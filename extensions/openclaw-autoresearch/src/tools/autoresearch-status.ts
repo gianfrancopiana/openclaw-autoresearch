@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi, OpenClawPluginToolContext } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi, OpenClawPluginToolContext } from "openclaw/plugin-sdk/core";
 import { Type } from "@sinclair/typebox";
 import { reconstructStateFromJsonl, type AutoresearchStateSnapshot } from "../state.js";
 import {
@@ -16,6 +16,7 @@ import {
   getAutoresearchSessionLockStatus,
   type AutoresearchSessionLockStatus,
 } from "../session-lock.js";
+import { prepareAutoresearchToolExecution } from "./preflight.js";
 
 export type AutoresearchStatusDiagnostics = {
   readonly warnings: readonly string[];
@@ -55,10 +56,19 @@ export function createAutoresearchStatusTool(
       _signal: AbortSignal,
       _onUpdate: unknown,
     ) {
-      const scope = resolveToolExecutionScope({
+      const resolvedScope = resolveToolExecutionScope({
         toolContext,
         requestedCwd: params.cwd,
       });
+      const prepared = await prepareAutoresearchToolExecution({
+        runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
+        scope: resolvedScope,
+      });
+      if (!prepared.ok) {
+        return prepared.failure;
+      }
+
+      const scope = prepared.scope;
       const cwd = scope.repoDir;
       const state = reconstructStateFromJsonl(cwd);
       const runtimeState = getAutoresearchRuntimeState(scope);

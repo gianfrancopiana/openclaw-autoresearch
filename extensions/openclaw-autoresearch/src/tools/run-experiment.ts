@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi, OpenClawPluginToolContext } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi, OpenClawPluginToolContext } from "openclaw/plugin-sdk/core";
 import { RunExperimentParams } from "./schemas.js";
 import { executeExperimentCommand } from "../execute.js";
 import {
@@ -13,6 +13,7 @@ import { readAutoresearchCheckpoint, writeAutoresearchCheckpoint } from "../chec
 import { readRecentLoggedRuns, reconstructStateFromJsonl } from "../state.js";
 import { syncAutoresearchSessionDoc } from "../session-doc.js";
 import { acquireAutoresearchSessionLock } from "../session-lock.js";
+import { prepareAutoresearchToolExecution } from "./preflight.js";
 
 export function createRunExperimentTool(
   api: OpenClawPluginApi,
@@ -34,10 +35,20 @@ export function createRunExperimentTool(
       signal: AbortSignal,
       onUpdate: ((update: unknown) => void | Promise<void>) | undefined,
     ) {
-      const scope = resolveToolExecutionScope({
+      const resolvedScope = resolveToolExecutionScope({
         toolContext,
         requestedCwd: params.cwd,
       });
+      const prepared = await prepareAutoresearchToolExecution({
+        runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
+        scope: resolvedScope,
+        requireBash: true,
+      });
+      if (!prepared.ok) {
+        return prepared.failure;
+      }
+
+      const scope = prepared.scope;
       const cwd = scope.repoDir;
       const lockStatus = acquireAutoresearchSessionLock(scope);
       if (lockStatus.state === "active" && !lockStatus.ownedByCurrentSession) {
