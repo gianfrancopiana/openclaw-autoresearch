@@ -7,18 +7,27 @@
 
 ## Release
 
-1. Update `package.json` and `openclaw.plugin.json` if you are changing the version.
-   Keep `package.json#openclaw.install`, `package.json#openclaw.compat`, and
-   `package.json#openclaw.build` aligned if the minimum supported OpenClaw
-   version changes.
-2. Run the release checks:
+1. Update the package version in `package.json`.
+2. Sync the plugin manifest metadata:
+
+   ```bash
+   npm run sync:release-metadata
+   ```
+
+   If you change the minimum supported OpenClaw version, keep
+   `openclaw.install`, `openclaw.compat`, and `openclaw.build` aligned too.
+
+3. Run the release checks:
 
    ```bash
    npm install
    npm run release:verify
    ```
 
-3. Publish:
+   CI runs the same release verification, so metadata drift should fail before
+   publish.
+
+4. Publish:
 
    ```bash
    npm publish --otp=123456
