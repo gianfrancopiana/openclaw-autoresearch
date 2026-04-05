@@ -28,11 +28,16 @@ describe("plugin registration", () => {
       "session_end",
     ]);
     expect(api.registerTool).toHaveBeenCalledTimes(4);
-    expect(api.registerTool.mock.calls.map(([tool]) => tool.name)).toEqual([
-      "init_experiment",
-      "run_experiment",
-      "log_experiment",
-      "autoresearch_status",
-    ]);
+    expect(
+      api.registerTool.mock.calls.map(([tool]) =>
+        typeof tool === "function"
+          ? tool({
+              workspaceDir: "/tmp/repo",
+              sessionKey: "session:test",
+              sessionId: "session:test:1",
+            }).name
+          : tool.name,
+      ),
+    ).toEqual(["init_experiment", "run_experiment", "log_experiment", "autoresearch_status"]);
   });
 });

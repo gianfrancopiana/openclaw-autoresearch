@@ -1,19 +1,48 @@
 import path from "node:path";
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginToolContext } from "openclaw/plugin-sdk";
+import { type ResolvedAutoresearchScope, resolveAutoresearchScope } from "../scope.js";
 
-export function resolveToolCwd(api: OpenClawPluginApi, requestedCwd?: unknown): string {
+export type ResolvedToolExecutionScope = Omit<ResolvedAutoresearchScope, "repoDir"> & {
+  readonly repoDir: string;
+};
+
+export function resolveToolExecutionScope(params: {
+  toolContext?: Pick<OpenClawPluginToolContext, "sessionKey" | "sessionId" | "workspaceDir">;
+  requestedCwd?: unknown;
+}): ResolvedToolExecutionScope {
+  const baseScope = resolveAutoresearchScope({
+    sessionKey: params.toolContext?.sessionKey,
+    sessionId: params.toolContext?.sessionId,
+    workspaceDir: params.toolContext?.workspaceDir,
+  });
   const normalizedRequestedCwd =
-    typeof requestedCwd === "string" ? requestedCwd.trim() : "";
+    typeof params.requestedCwd === "string" ? params.requestedCwd.trim() : "";
 
-  const cwd = normalizedRequestedCwd
-    ? path.isAbsolute(normalizedRequestedCwd)
-      ? normalizedRequestedCwd
-      : api.resolvePath(normalizedRequestedCwd)
-    : api.resolvePath(".");
-
-  if (typeof cwd !== "string" || cwd.trim().length === 0) {
-    throw new Error("Could not resolve repo cwd for autoresearch tool execution.");
+  let repoDir = baseScope.workspaceDir;
+  if (normalizedRequestedCwd) {
+    repoDir = path.isAbsolute(normalizedRequestedCwd)
+      ? path.resolve(normalizedRequestedCwd)
+      : baseScope.workspaceDir
+        ? path.resolve(baseScope.workspaceDir, normalizedRequestedCwd)
+        : null;
   }
 
-  return cwd;
+  const scope = resolveAutoresearchScope({
+    sessionKey: baseScope.sessionKey,
+    sessionId: baseScope.sessionId,
+    workspaceDir: baseScope.workspaceDir,
+    repoDir,
+  });
+  if (!scope.repoDir) {
+    throw new Error(
+      normalizedRequestedCwd && !path.isAbsolute(normalizedRequestedCwd)
+        ? "Relative cwd overrides require a workspaceDir in the OpenClaw tool context."
+        : "Could not resolve the active workspace for autoresearch tool execution. OpenClaw provides workspaceDir in the tool context; use cwd only as an explicit override.",
+    );
+  }
+
+  return {
+    ...scope,
+    repoDir: scope.repoDir,
+  };
 }

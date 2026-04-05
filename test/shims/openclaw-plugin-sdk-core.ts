@@ -2,7 +2,20 @@ export type CommandRegistration = {
   name: string;
   description: string;
   acceptsArgs?: boolean;
-  handler: (ctx: { args?: string; cwd?: string }) => { text: string };
+  handler: (ctx: {
+    args?: string;
+    sessionKey?: string;
+    sessionId?: string;
+    workspaceDir?: string;
+    runId?: string;
+    cwd?: string;
+  }) => { text: string };
+};
+
+export type OpenClawPluginToolContext = {
+  sessionKey?: string;
+  sessionId?: string;
+  workspaceDir?: string;
 };
 
 export type ToolRegistration = {
@@ -37,12 +50,33 @@ export type OpenClawPluginApi = {
       }>;
     };
   };
-  registerTool(tool: ToolRegistration): void;
+  registerTool(tool: ToolRegistration | ((ctx: OpenClawPluginToolContext) => ToolRegistration)): void;
   registerCommand(command: CommandRegistration): void;
-  on?(hookName: string, handler: (event: unknown, ctx: { cwd?: string }) => unknown): void;
+  on?(
+    hookName: string,
+    handler: (
+      event: unknown,
+      ctx: {
+        sessionKey?: string;
+        sessionId?: string;
+        workspaceDir?: string;
+        runId?: string;
+        cwd?: string;
+      },
+    ) => unknown,
+  ): void;
   registerHook?(
     hookName: string,
-    handler: (event: { systemPrompt?: string }, ctx: { cwd?: string }) => { systemPrompt?: string } | void,
+    handler: (
+      event: { systemPrompt?: string },
+      ctx: {
+        sessionKey?: string;
+        sessionId?: string;
+        workspaceDir?: string;
+        runId?: string;
+        cwd?: string;
+      },
+    ) => { systemPrompt?: string } | void,
   ): void;
 };
 

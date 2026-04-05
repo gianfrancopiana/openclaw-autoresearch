@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi, OpenClawPluginToolContext } from "openclaw/plugin-sdk";
 import { LogExperimentParams } from "./schemas.js";
 import { commitKeptExperiment, readCurrentBranch, readShortHeadCommit } from "../git.js";
 import { appendResultEntry, type AutoresearchResultEntry } from "../logging.js";
@@ -17,13 +17,16 @@ import {
   consumeAutoresearchSteers,
   setAutoresearchRunInFlight,
 } from "../runtime-state.js";
-import { resolveToolCwd } from "./tool-cwd.js";
+import { resolveToolExecutionScope } from "./tool-cwd.js";
 import { readAutoresearchCheckpoint, writeAutoresearchCheckpoint } from "../checkpoint.js";
 import { syncAutoresearchSessionDoc } from "../session-doc.js";
 import { computeConfidence, formatConfidenceLine } from "../confidence.js";
 import { acquireAutoresearchSessionLock } from "../session-lock.js";
 
-export function createLogExperimentTool(api: OpenClawPluginApi) {
+export function createLogExperimentTool(
+  api: OpenClawPluginApi,
+  toolContext?: Pick<OpenClawPluginToolContext, "sessionKey" | "sessionId" | "workspaceDir">,
+) {
   return {
     name: "log_experiment",
     label: "Log Experiment",
@@ -45,9 +48,13 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
       _signal: AbortSignal,
       _onUpdate: unknown,
     ) {
-      const cwd = resolveToolCwd(api, params.cwd);
-      const lockStatus = acquireAutoresearchSessionLock(cwd);
-      if (lockStatus.state === "active" && !lockStatus.ownedByCurrentProcess) {
+      const scope = resolveToolExecutionScope({
+        toolContext,
+        requestedCwd: params.cwd,
+      });
+      const cwd = scope.repoDir;
+      const lockStatus = acquireAutoresearchSessionLock(scope);
+      if (lockStatus.state === "active" && !lockStatus.ownedByCurrentSession) {
         return {
           content: [
             {
@@ -67,7 +74,7 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
       }
 
       const checkpoint = readAutoresearchCheckpoint(cwd);
-      const pendingRun = getAutoresearchPendingRun(cwd) ?? checkpoint?.pendingRun ?? null;
+      const pendingRun = getAutoresearchPendingRun(scope) ?? checkpoint?.pendingRun ?? null;
       const state = reconstructStateFromJsonl(cwd);
       const secondaryMetrics = params.metrics ?? pendingRun?.metrics ?? {};
       const inferredCommit =
@@ -158,7 +165,7 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
       if (params.status === "keep") {
         const gitResult = await commitKeptExperiment({
           runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
-          cwd: cwd,
+          cwd,
           description: params.description,
           metricName: state.metricName,
           metric: inferredMetric,
@@ -236,9 +243,9 @@ export function createLogExperimentTool(api: OpenClawPluginApi) {
         knownSecondaryMetrics,
       );
       const nextState: AutoresearchStateSnapshot = reconstructStateFromJsonl(cwd);
-      const queuedSteers = consumeAutoresearchSteers(cwd);
-      consumeAutoresearchPendingRun(cwd);
-      setAutoresearchRunInFlight(cwd, false);
+      const queuedSteers = consumeAutoresearchSteers(scope);
+      consumeAutoresearchPendingRun(scope);
+      setAutoresearchRunInFlight(scope, false);
       const currentBranch = await readCurrentBranch({
         runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
         cwd,
@@ -372,55 +379,61 @@ function readCurrentSegmentResults(cwd: string, segment: number): CurrentSegment
       continue;
     }
 
+    const metricsValue = entry.metrics;
+    const metrics =
+      metricsValue && typeof metricsValue === "object" && !Array.isArray(metricsValue)
+        ? Object.fromEntries(
+            Object.entries(metricsValue).filter(([, value]) => typeof value === "number"),
+          )
+        : {};
     results.push({
       metric: entry.metric,
-      metrics:
-        entry.metrics && typeof entry.metrics === "object"
-          ? (entry.metrics as Record<string, number>)
-          : {},
+      metrics,
       status:
-        entry.status === "keep" || entry.status === "discard" || entry.status === "crash"
-          ? entry.status
-          : "keep",
+        entry.status === "discard" || entry.status === "crash" ? entry.status : "keep",
     });
   }
 
   return results;
 }
 
-function findBaselineSecondaryMetrics(
-  currentResults: readonly CurrentSegmentResult[],
-  secondaryMetrics: readonly SecondaryMetricDef[],
-): Record<string, number> {
-  const baseline =
-    currentResults.length > 0 ? { ...currentResults[0].metrics } : {};
-
-  for (const metric of secondaryMetrics) {
-    if (baseline[metric.name] !== undefined) {
-      continue;
-    }
-    for (const result of currentResults) {
-      const value = result.metrics[metric.name];
-      if (value !== undefined) {
-        baseline[metric.name] = value;
-        break;
-      }
-    }
+function inferMetricUnit(metricName: string): string {
+  const lower = metricName.toLowerCase();
+  if (lower.endsWith("_ms") || lower.includes("millisecond")) {
+    return "ms";
   }
-
-  return baseline;
+  if (lower.endsWith("_s") || lower.includes("second")) {
+    return "s";
+  }
+  if (lower.endsWith("_kb") || lower.includes("kilobyte")) {
+    return "kb";
+  }
+  if (lower.endsWith("_mb") || lower.includes("megabyte")) {
+    return "mb";
+  }
+  if (lower.endsWith("_pct") || lower.endsWith("_percent") || lower.includes("percent")) {
+    return "%";
+  }
+  return "";
 }
 
-function buildResultText(options: {
+function findBaselineSecondaryMetrics(
+  currentResults: readonly CurrentSegmentResult[],
+  knownMetrics: readonly SecondaryMetricDef[],
+): Record<string, number> {
+  if (currentResults.length === 0) {
+    return Object.fromEntries(knownMetrics.map((metric) => [metric.name, NaN]));
+  }
+
+  const baseline = currentResults[0]?.metrics ?? {};
+  return Object.fromEntries(
+    knownMetrics.map((metric) => [metric.name, baseline[metric.name] ?? NaN]),
+  );
+}
+
+function buildResultText(params: {
   state: AutoresearchStateSnapshot;
-  experiment: {
-    run: number;
-    commit: string;
-    metric: number;
-    metrics: Record<string, number>;
-    status: "keep" | "discard" | "crash";
-    description: string;
-  };
+  experiment: AutoresearchResultEntry;
   baselineMetric: number;
   baselineSecondaryMetrics: Record<string, number>;
   totalRunCount: number;
@@ -432,90 +445,67 @@ function buildResultText(options: {
   ideaAppended: boolean;
   confidence: number | null;
 }): string {
-  let text = options.baseline
-    ? `Logged #${options.experiment.run}: baseline - ${options.experiment.description}`
-    : `Logged #${options.experiment.run}: ${options.experiment.status} - ${options.experiment.description}`;
-  text += `\nBaseline ${options.state.metricName}: ${formatMetric(options.baselineMetric, options.state.metricUnit)}`;
+  const delta = params.experiment.metric - params.baselineMetric;
+  const direction = params.state.bestDirection === "lower" ? -1 : 1;
+  const baselineComparison =
+    params.baseline
+      ? "This run established the baseline for the current segment."
+      : delta === 0
+        ? `Matched baseline (${params.baselineMetric}${params.state.metricUnit}).`
+        : direction * delta > 0
+          ? `Improved vs baseline by ${Math.abs(delta)}${params.state.metricUnit}.`
+          : `Regressed vs baseline by ${Math.abs(delta)}${params.state.metricUnit}.`;
 
-  if (options.experiment.run > 1 && options.experiment.status === "keep" && options.experiment.metric > 0) {
-    const delta = options.experiment.metric - options.baselineMetric;
-    const pct = options.baselineMetric === 0 ? null : (delta / options.baselineMetric) * 100;
-    text += ` | this: ${formatMetric(options.experiment.metric, options.state.metricUnit)}`;
-    if (pct !== null) {
-      const sign = delta > 0 ? "+" : "";
-      text += ` (${sign}${pct.toFixed(1)}%)`;
-    }
-  }
-
-  if (Object.keys(options.experiment.metrics).length > 0) {
-    const parts = Object.entries(options.experiment.metrics).map(([name, value]) => {
-      const metricDef = options.knownSecondaryMetrics.find((metric) => metric.name === name);
-      let part = `${name}: ${formatMetric(value, metricDef?.unit ?? "")}`;
-      const baselineValue = options.baselineSecondaryMetrics[name];
-      if (
-        baselineValue !== undefined &&
-        options.experiment.run > 1 &&
-        baselineValue !== 0
-      ) {
-        const delta = value - baselineValue;
-        const sign = delta > 0 ? "+" : "";
-        part += ` (${sign}${((delta / baselineValue) * 100).toFixed(1)}%)`;
+  const secondaryMetricLines = params.knownSecondaryMetrics
+    .map((metric) => {
+      const value = params.experiment.metrics[metric.name];
+      const baselineValue = params.baselineSecondaryMetrics[metric.name];
+      if (value === undefined) {
+        return null;
       }
-      return part;
-    });
-    text += `\nSecondary: ${parts.join("  ")}`;
+      const change =
+        typeof baselineValue === "number" && Number.isFinite(baselineValue)
+          ? value - baselineValue
+          : null;
+      const deltaText =
+        change === null
+          ? ""
+          : change === 0
+            ? " (matched baseline)"
+            : `${change > 0 ? " (+" : " ("}${change}${metric.unit})`;
+      return `- ${metric.name}: ${value}${metric.unit}${deltaText}`;
+    })
+    .filter((line): line is string => line !== null);
+
+  const lines = [
+    `Logged #${params.totalRunCount}: ${params.experiment.status} - ${params.experiment.description}`,
+    `Metric: ${params.experiment.metric}${params.state.metricUnit}`,
+    baselineComparison,
+    params.gitSummary,
+  ];
+
+  if (secondaryMetricLines.length > 0) {
+    lines.push("", "Secondary metrics:", ...secondaryMetricLines);
   }
 
-  if (options.confidence !== null) {
-    text += `\n${formatConfidenceLine(options.confidence)}`;
+  if (params.usedPendingRun) {
+    lines.push("", "Used the pending run_experiment result as the source of truth for commit and/or metric.");
   }
 
-  text += `\n(${options.totalRunCount} experiments in current segment)`;
-  if (options.usedPendingRun) {
-    text += "\nUsed the pending run_experiment result as the source of truth for commit/metric defaults.";
-  }
-  if (options.baseline) {
-    text += "\nThis run established the baseline for the current segment.";
-  }
-  if (options.ideaAppended) {
-    text += "\nAdded a follow-up idea to autoresearch.ideas.md.";
-  }
-  text += `\n${options.gitSummary}`;
-
-  if (options.queuedSteers.length > 0) {
-    const steerLabel = options.queuedSteers.length === 1 ? "steer" : "steers";
-    text += `\n\nQueued user ${steerLabel} captured during this experiment:`;
-    for (const steer of options.queuedSteers) {
-      text += `\n- ${steer}`;
+  if (params.queuedSteers.length > 0) {
+    lines.push("", "Queued user steers captured during this experiment:");
+    for (const steer of params.queuedSteers) {
+      lines.push(`- ${steer}`);
     }
-    text +=
-      "\nTreat any immediate followup turn that repeats the same steer as the normal OpenClaw queue/backlog delivery for these messages.";
   }
 
-  return text;
-}
-
-function inferMetricUnit(name: string): string {
-  if (name.endsWith("_µs") || name.includes("µs")) {
-    return "µs";
+  if (params.ideaAppended) {
+    lines.push("", "Appended the idea note to autoresearch.ideas.md.");
   }
-  if (name.endsWith("_ms") || name.includes("ms")) {
-    return "ms";
-  }
-  if (name.endsWith("_s") || name.includes("sec")) {
-    return "s";
-  }
-  return "";
-}
 
-function formatMetric(value: number, unit: string): string {
-  const rendered =
-    value === Math.round(value) ? `${Math.round(value)}` : value.toFixed(2);
-  return `${addCommas(rendered)}${unit}`;
-}
+  if (params.confidence !== null) {
+    lines.push("", formatConfidenceLine(params.confidence));
+  }
 
-function addCommas(value: string): string {
-  const [integerPart, fractionalPart] = value.split(".");
-  const normalizedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return fractionalPart ? `${normalizedInteger}.${fractionalPart}` : normalizedInteger;
+  return lines.join("\n");
 }

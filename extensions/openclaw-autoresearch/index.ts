@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi, OpenClawPluginToolContext } from "openclaw/plugin-sdk";
 import {
   AUTORESEARCH_PLUGIN_DESCRIPTION,
   AUTORESEARCH_PLUGIN_ID,
@@ -12,6 +12,16 @@ import { createAutoresearchStatusTool } from "./src/tools/autoresearch-status.js
 import { registerAutoresearchHooks } from "./src/hooks.js";
 import { registerAutoresearchCommand } from "./src/commands/autoresearch.js";
 
+function createToolFactory<TTool>(
+  createTool: (
+    api: OpenClawPluginApi,
+    toolContext?: Pick<OpenClawPluginToolContext, "sessionKey" | "sessionId" | "workspaceDir">,
+  ) => TTool,
+  api: OpenClawPluginApi,
+) {
+  return (toolContext: OpenClawPluginToolContext) => createTool(api, toolContext);
+}
+
 const plugin = {
   id: AUTORESEARCH_PLUGIN_ID,
   name: AUTORESEARCH_PLUGIN_NAME,
@@ -20,10 +30,10 @@ const plugin = {
   register(api: OpenClawPluginApi) {
     registerAutoresearchHooks(api);
     registerAutoresearchCommand(api);
-    api.registerTool(createInitExperimentTool(api));
-    api.registerTool(createRunExperimentTool(api));
-    api.registerTool(createLogExperimentTool(api));
-    api.registerTool(createAutoresearchStatusTool(api));
+    api.registerTool(createToolFactory(createInitExperimentTool, api));
+    api.registerTool(createToolFactory(createRunExperimentTool, api));
+    api.registerTool(createToolFactory(createLogExperimentTool, api));
+    api.registerTool(createToolFactory(createAutoresearchStatusTool, api));
   },
 };
 

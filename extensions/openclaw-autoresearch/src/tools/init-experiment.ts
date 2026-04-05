@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi, OpenClawPluginToolContext } from "openclaw/plugin-sdk";
 import { InitExperimentParams } from "./schemas.js";
 import { createConfigHeader, writeConfigHeader } from "../logging.js";
 import {
@@ -12,10 +12,13 @@ import { readAutoresearchCheckpoint, writeAutoresearchCheckpoint } from "../chec
 import { syncAutoresearchSessionDoc } from "../session-doc.js";
 import { readCurrentBranch, readShortHeadCommit } from "../git.js";
 import { setAutoresearchPendingRun, setAutoresearchRunInFlight } from "../runtime-state.js";
-import { resolveToolCwd } from "./tool-cwd.js";
+import { resolveToolExecutionScope } from "./tool-cwd.js";
 import { acquireAutoresearchSessionLock } from "../session-lock.js";
 
-export function createInitExperimentTool(api: OpenClawPluginApi) {
+export function createInitExperimentTool(
+  api: OpenClawPluginApi,
+  toolContext?: Pick<OpenClawPluginToolContext, "sessionKey" | "sessionId" | "workspaceDir">,
+) {
   return {
     name: "init_experiment",
     label: "Init Experiment",
@@ -35,9 +38,13 @@ export function createInitExperimentTool(api: OpenClawPluginApi) {
       _signal: AbortSignal,
       _onUpdate: unknown,
     ) {
-      const cwd = resolveToolCwd(api, params.cwd);
-      const lockStatus = acquireAutoresearchSessionLock(cwd);
-      if (lockStatus.state === "active" && !lockStatus.ownedByCurrentProcess) {
+      const scope = resolveToolExecutionScope({
+        toolContext,
+        requestedCwd: params.cwd,
+      });
+      const cwd = scope.repoDir;
+      const lockStatus = acquireAutoresearchSessionLock(scope);
+      if (lockStatus.state === "active" && !lockStatus.ownedByCurrentSession) {
         return {
           content: [
             {
@@ -132,8 +139,8 @@ export function createInitExperimentTool(api: OpenClawPluginApi) {
         };
       }
 
-      setAutoresearchPendingRun(cwd, null);
-      setAutoresearchRunInFlight(cwd, false);
+      setAutoresearchPendingRun(scope, null);
+      setAutoresearchRunInFlight(scope, false);
 
       const nextPersistentState = reconstructStateFromJsonl(cwd);
       const sessionStartCommit = await readShortHeadCommit({

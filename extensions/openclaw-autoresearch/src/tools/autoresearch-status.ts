@@ -1,11 +1,11 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi, OpenClawPluginToolContext } from "openclaw/plugin-sdk";
 import { Type } from "@sinclair/typebox";
 import { reconstructStateFromJsonl, type AutoresearchStateSnapshot } from "../state.js";
 import {
   getAutoresearchRuntimeState,
   type AutoresearchRuntimeSnapshot,
 } from "../runtime-state.js";
-import { resolveToolCwd } from "./tool-cwd.js";
+import { resolveToolExecutionScope } from "./tool-cwd.js";
 import {
   readAutoresearchCheckpoint,
   type AutoresearchCheckpoint,
@@ -37,7 +37,10 @@ const AutoresearchStatusParams = Type.Object(
   { additionalProperties: false },
 );
 
-export function createAutoresearchStatusTool(api: OpenClawPluginApi) {
+export function createAutoresearchStatusTool(
+  api: OpenClawPluginApi,
+  toolContext?: Pick<OpenClawPluginToolContext, "sessionKey" | "sessionId" | "workspaceDir">,
+) {
   return {
     name: "autoresearch_status",
     label: "Autoresearch Status",
@@ -52,10 +55,14 @@ export function createAutoresearchStatusTool(api: OpenClawPluginApi) {
       _signal: AbortSignal,
       _onUpdate: unknown,
     ) {
-      const cwd = resolveToolCwd(api, params.cwd);
+      const scope = resolveToolExecutionScope({
+        toolContext,
+        requestedCwd: params.cwd,
+      });
+      const cwd = scope.repoDir;
       const state = reconstructStateFromJsonl(cwd);
-      const runtimeState = getAutoresearchRuntimeState(cwd);
-      const diagnostics = await buildAutoresearchStatusDiagnostics(api, cwd, state);
+      const runtimeState = getAutoresearchRuntimeState(scope);
+      const diagnostics = await buildAutoresearchStatusDiagnostics(api, scope, state);
 
       return {
         content: [
@@ -161,19 +168,19 @@ function formatMetric(value: number | null, unit: string): string {
 
 async function buildAutoresearchStatusDiagnostics(
   api: OpenClawPluginApi,
-  cwd: string,
+  scope: ReturnType<typeof resolveToolExecutionScope>,
   state: AutoresearchStateSnapshot,
 ): Promise<AutoresearchStatusDiagnostics> {
-  const checkpoint = readAutoresearchCheckpoint(cwd);
+  const checkpoint = readAutoresearchCheckpoint(scope.repoDir);
   const gitHead = await readShortHeadCommit({
     runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
-    cwd,
+    cwd: scope.repoDir,
   });
   const gitBranch = await readCurrentBranch({
     runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
-    cwd,
+    cwd: scope.repoDir,
   });
-  const lock = getAutoresearchSessionLockStatus(cwd);
+  const lock = getAutoresearchSessionLockStatus(scope);
   const warnings: string[] = [];
 
   if (checkpoint?.pendingRun) {
@@ -186,17 +193,13 @@ async function buildAutoresearchStatusDiagnostics(
     warnings.push(
       `Stale autoresearch.lock detected for PID ${lock.pid}. Remove it after confirming that process is gone.`,
     );
-  } else if (lock.state === "active" && !lock.ownedByCurrentProcess) {
+  } else if (lock.state === "active" && !lock.ownedByCurrentSession) {
     warnings.push(
       `Another live autoresearch loop appears active (PID ${lock.pid}, started ${new Date(lock.timestamp ?? 0).toISOString()}). Resume that loop instead of branching off a new one.`,
     );
   }
 
-  if (
-    checkpoint?.canonicalBranch &&
-    gitBranch &&
-    checkpoint.canonicalBranch !== gitBranch
-  ) {
+  if (checkpoint?.canonicalBranch && gitBranch && checkpoint.canonicalBranch !== gitBranch) {
     warnings.push(
       `Branch drift: current branch is ${gitBranch}, but the canonical autoresearch branch is ${checkpoint.canonicalBranch}. Switch back before continuing the loop.`,
     );
@@ -209,7 +212,7 @@ async function buildAutoresearchStatusDiagnostics(
   if (driftBase) {
     const commitsAhead = await countCommitsSince({
       runCommandWithTimeout: api.runtime.system.runCommandWithTimeout,
-      cwd,
+      cwd: scope.repoDir,
       sinceCommit: driftBase,
     });
 
@@ -248,7 +251,7 @@ function formatLockStatus(lock: AutoresearchSessionLockStatus): string {
   if (lock.state === "stale") {
     return `stale (${owner}, started ${timestamp})`;
   }
-  return lock.ownedByCurrentProcess
-    ? `active (current process, ${owner}, started ${timestamp})`
+  return lock.ownedByCurrentSession
+    ? `active (current session, ${owner}, started ${timestamp})`
     : `active (${owner}, started ${timestamp})`;
 }

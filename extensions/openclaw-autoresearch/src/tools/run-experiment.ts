@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi, OpenClawPluginToolContext } from "openclaw/plugin-sdk";
 import { RunExperimentParams } from "./schemas.js";
 import { executeExperimentCommand } from "../execute.js";
 import {
@@ -6,7 +6,7 @@ import {
   setAutoresearchPendingRun,
   setAutoresearchRunInFlight,
 } from "../runtime-state.js";
-import { resolveToolCwd } from "./tool-cwd.js";
+import { resolveToolExecutionScope } from "./tool-cwd.js";
 import { parseMetricLines } from "../metrics.js";
 import { readCurrentBranch, readShortHeadCommit } from "../git.js";
 import { readAutoresearchCheckpoint, writeAutoresearchCheckpoint } from "../checkpoint.js";
@@ -14,7 +14,10 @@ import { readRecentLoggedRuns, reconstructStateFromJsonl } from "../state.js";
 import { syncAutoresearchSessionDoc } from "../session-doc.js";
 import { acquireAutoresearchSessionLock } from "../session-lock.js";
 
-export function createRunExperimentTool(api: OpenClawPluginApi) {
+export function createRunExperimentTool(
+  api: OpenClawPluginApi,
+  toolContext?: Pick<OpenClawPluginToolContext, "sessionKey" | "sessionId" | "workspaceDir">,
+) {
   return {
     name: "run_experiment",
     label: "Run Experiment",
@@ -31,9 +34,13 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
       signal: AbortSignal,
       onUpdate: ((update: unknown) => void | Promise<void>) | undefined,
     ) {
-      const cwd = resolveToolCwd(api, params.cwd);
-      const lockStatus = acquireAutoresearchSessionLock(cwd);
-      if (lockStatus.state === "active" && !lockStatus.ownedByCurrentProcess) {
+      const scope = resolveToolExecutionScope({
+        toolContext,
+        requestedCwd: params.cwd,
+      });
+      const cwd = scope.repoDir;
+      const lockStatus = acquireAutoresearchSessionLock(scope);
+      if (lockStatus.state === "active" && !lockStatus.ownedByCurrentSession) {
         return {
           content: [
             {
@@ -53,7 +60,7 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
       }
 
       const checkpoint = readAutoresearchCheckpoint(cwd);
-      const existingPendingRun = getAutoresearchPendingRun(cwd) ?? checkpoint?.pendingRun ?? null;
+      const existingPendingRun = getAutoresearchPendingRun(scope) ?? checkpoint?.pendingRun ?? null;
 
       if (existingPendingRun) {
         return {
@@ -74,7 +81,7 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
         };
       }
 
-      setAutoresearchRunInFlight(cwd, true);
+      setAutoresearchRunInFlight(scope, true);
 
       if (onUpdate) {
         await onUpdate({
@@ -93,7 +100,7 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
           signal,
         });
       } catch (error) {
-        setAutoresearchRunInFlight(cwd, false);
+        setAutoresearchRunInFlight(scope, false);
         throw error;
       }
 
@@ -133,7 +140,7 @@ export function createRunExperimentTool(api: OpenClawPluginApi) {
         tailOutput: details.tailOutput,
         capturedAt: Date.now(),
       } as const;
-      setAutoresearchPendingRun(cwd, pendingRun);
+      setAutoresearchPendingRun(scope, pendingRun);
       const nextCheckpoint = writeAutoresearchCheckpoint({
         cwd,
         state,

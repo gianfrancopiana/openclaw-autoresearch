@@ -20,7 +20,10 @@ describe("formatAutoresearchStatusText", () => {
         state: "missing",
         pid: null,
         timestamp: null,
+        sessionKey: null,
+        sessionId: null,
         ownedByCurrentProcess: false,
+        ownedByCurrentSession: false,
       },
     };
     const text = formatAutoresearchStatusText(
