@@ -5,6 +5,14 @@
   "skills": [
     "./skills"
   ],
+  "contracts": {
+    "tools": [
+      "init_experiment",
+      "run_experiment",
+      "log_experiment",
+      "autoresearch_status"
+    ]
+  },
   "version": "1.0.5",
   "configSchema": {
     "type": "object",
