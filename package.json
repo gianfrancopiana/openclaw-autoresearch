@@ -1,18 +1,28 @@
 {
   "name": "@gianfrancopiana/openclaw-autoresearch",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Faithful OpenClaw port of pi-autoresearch.",
   "type": "module",
-  "main": "./index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
+    "build": "node ./scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
     "check:release-metadata": "node ./scripts/release-metadata.mjs",
     "sync:release-metadata": "node ./scripts/release-metadata.mjs --write",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "validate": "npm run check:release-metadata && npm run typecheck && npm run test",
-    "release:verify": "npm run validate && npm pack --dry-run",
+    "release:verify": "npm run validate && npm run build && npm pack --dry-run",
     "release:check-tag": "node ./scripts/check-release-tag.mjs",
     "release:prepare": "node ./scripts/prepare-release.mjs",
+    "prepack": "npm run build",
     "prepublishOnly": "npm run release:verify",
     "smoke:openclaw-host": "node ./scripts/smoke-openclaw-host.mjs",
     "smoke:registry-openclaw-host": "node ./scripts/smoke-openclaw-registry.mjs"
@@ -26,6 +36,7 @@
     "experimentation"
   ],
   "files": [
+    "dist/",
     "index.ts",
     "extensions/openclaw-autoresearch/**/*.ts",
     "openclaw.plugin.json",
@@ -67,6 +78,9 @@
   "openclaw": {
     "extensions": [
       "./index.ts"
+    ],
+    "runtimeExtensions": [
+      "./dist/index.js"
     ],
     "install": {
       "minHostVersion": ">=2026.4.24"

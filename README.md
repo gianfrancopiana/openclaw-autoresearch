@@ -65,8 +65,8 @@ openclaw plugins install ./gianfrancopiana-openclaw-autoresearch-<version>.tgz
 ```
 
 The install command records the plugin, enables it, and makes it available
-after restart. OpenClaw reads the package metadata, loads the root
-[`index.ts`](index.ts), and finds the manifest in
+after restart. OpenClaw reads the package metadata, loads the compiled runtime
+entry [`dist/index.js`](dist/index.js), and finds the manifest in
 [`openclaw.plugin.json`](openclaw.plugin.json).
 
 Verify:

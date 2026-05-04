@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": ".",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "paths": {
+      "openclaw/plugin-sdk": ["./types/openclaw-plugin-sdk-core.d.ts"],
+      "openclaw/plugin-sdk/core": ["./types/openclaw-plugin-sdk-core.d.ts"],
+      "openclaw/plugin-sdk/plugin-entry": ["./types/openclaw-plugin-sdk-core.d.ts"]
+    }
+  },
+  "include": [
+    "index.ts",
+    "extensions/openclaw-autoresearch/**/*.ts"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "test"
+  ]
+}

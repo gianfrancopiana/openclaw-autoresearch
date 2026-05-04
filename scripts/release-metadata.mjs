@@ -13,6 +13,8 @@ const expectedTools = [
   "log_experiment",
   "autoresearch_status",
 ];
+const expectedExtensions = ["./index.ts"];
+const expectedRuntimeExtensions = ["./dist/index.js"];
 const requiredKeywords = [
   "openclaw",
   "openclaw-plugin",
@@ -62,6 +64,14 @@ if (writeMode) {
   }
   if (expectedCompatRange) {
     const openclaw = ensureObject(pkg, "openclaw");
+    if (JSON.stringify(openclaw.extensions) !== JSON.stringify(expectedExtensions)) {
+      openclaw.extensions = [...expectedExtensions];
+      packageChanged = true;
+    }
+    if (JSON.stringify(openclaw.runtimeExtensions) !== JSON.stringify(expectedRuntimeExtensions)) {
+      openclaw.runtimeExtensions = [...expectedRuntimeExtensions];
+      packageChanged = true;
+    }
     const install = ensureObject(openclaw, "install");
     const compat = ensureObject(openclaw, "compat");
     if (install.minHostVersion !== expectedCompatRange) {
@@ -114,6 +124,8 @@ const minHostVersion = pkg.openclaw?.install?.minHostVersion;
 const pluginApiVersion = pkg.openclaw?.compat?.pluginApi;
 const peerOpenClawVersion = pkg.peerDependencies?.openclaw;
 const peerOpenClawMeta = pkg.peerDependenciesMeta?.openclaw;
+const extensions = pkg.openclaw?.extensions;
+const runtimeExtensions = pkg.openclaw?.runtimeExtensions;
 
 if (typeof buildVersion !== "string" || buildVersion.trim().length === 0) {
   fail("package.json openclaw.build.openclawVersion must be a non-empty string");
@@ -139,6 +151,14 @@ if (peerOpenClawVersion !== expectedCompatRange) {
 
 if (peerOpenClawMeta?.optional !== true) {
   fail("package.json peerDependenciesMeta.openclaw.optional must be true");
+}
+
+if (JSON.stringify(extensions) !== JSON.stringify(expectedExtensions)) {
+  fail(`package.json openclaw.extensions must equal ${expectedExtensions.join(", ")}`);
+}
+
+if (JSON.stringify(runtimeExtensions) !== JSON.stringify(expectedRuntimeExtensions)) {
+  fail(`package.json openclaw.runtimeExtensions must equal ${expectedRuntimeExtensions.join(", ")}`);
 }
 
 const toolContracts = manifest.contracts?.tools;

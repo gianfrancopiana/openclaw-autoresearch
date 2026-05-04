@@ -9,6 +9,8 @@ type PackageManifest = {
   peerDependencies?: Record<string, unknown>;
   peerDependenciesMeta?: Record<string, { optional?: unknown }>;
   openclaw?: {
+    extensions?: unknown;
+    runtimeExtensions?: unknown;
     install?: {
       minHostVersion?: unknown;
     };
@@ -44,6 +46,8 @@ describe("release metadata contract", () => {
     expect(manifest.version).toBe(pkg.version);
     expect(manifest.description).toBe(pkg.description);
     expect(buildVersion).toBe("2026.4.24");
+    expect(pkg.openclaw?.extensions).toEqual(["./index.ts"]);
+    expect(pkg.openclaw?.runtimeExtensions).toEqual(["./dist/index.js"]);
     expect(pkg.openclaw?.install?.minHostVersion).toBe(`>=${buildVersion}`);
     expect(pkg.openclaw?.compat?.pluginApi).toBe(`>=${buildVersion}`);
     expect(pkg.peerDependencies?.openclaw).toBe(`>=${buildVersion}`);
